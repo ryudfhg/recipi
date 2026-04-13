@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>献立管理</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <span id="header-title">献立</span>
+  </header>
+
+  <main class="app-main">
+
+    <!-- ===== 献立タブ ===== -->
+    <section id="tab-menu" class="tab active">
+      <div class="cal-nav">
+        <button class="icon-btn" onclick="changeMonth(-1)">&#8249;</button>
+        <span id="cal-title"></span>
+        <button class="icon-btn" onclick="changeMonth(1)">&#8250;</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>日</span><span>月</span><span>火</span><span>水</span>
+        <span>木</span><span>金</span><span>土</span>
+      </div>
+      <div id="cal-grid" class="cal-grid"></div>
+    </section>
+
+    <!-- ===== 在庫タブ ===== -->
+    <section id="tab-stock" class="tab">
+      <div id="cat-filters" class="filter-row">
+        <button class="chip active" onclick="filterStockCat('all',this)">すべて</button>
+        <button class="chip" onclick="filterStockCat('食材',this)">食材</button>
+        <button class="chip" onclick="filterStockCat('調味料',this)">調味料</button>
+        <button class="chip" onclick="filterStockCat('冷凍ストック',this)">冷凍</button>
+      </div>
+      <div id="status-filters" class="filter-row">
+        <button class="chip active" onclick="filterStockStatus('all',this)">すべて</button>
+        <button class="chip" onclick="filterStockStatus('low',this)">残り少ない</button>
+        <button class="chip" onclick="filterStockStatus('expiring',this)">期限間近</button>
+      </div>
+      <div id="stock-list" class="item-list"></div>
+    </section>
+
+    <!-- ===== 買い物リストタブ ===== -->
+    <section id="tab-shopping" class="tab">
+      <div class="action-row">
+        <button class="ghost-btn" onclick="clearChecked()">チェック済みを削除</button>
+        <button class="accent-btn" onclick="moveToStock()">在庫へ移動</button>
+      </div>
+      <div id="shopping-list" class="item-list"></div>
+    </section>
+
+    <!-- ===== レシピタブ ===== -->
+    <section id="tab-recipes" class="tab">
+      <button class="primary-btn full" onclick="openRecipeSheet()" style="margin-bottom:12px">＋ レシピを追加</button>
+      <div id="recipe-list" class="item-list"></div>
+    </section>
+
+    <!-- ===== 設定タブ ===== -->
+    <section id="tab-settings" class="tab">
+
+      <div class="card">
+        <h3 class="form-title">お名前の設定</h3>
+        <p class="setting-desc">カレンダーの出席表示に使われます（このデバイスのみに保存）</p>
+        <div class="field-group">
+          <div>
+            <label class="date-label">あなたの名前</label>
+            <input type="text" id="p1-name-input" placeholder="自分" class="field">
+          </div>
+          <div>
+            <label class="date-label">パートナーの名前</label>
+            <input type="text" id="p2-name-input" placeholder="パートナー" class="field">
+          </div>
+        </div>
+        <button class="primary-btn full" onclick="saveNames()">名前を保存</button>
+      </div>
+
+      <div class="card">
+        <h3 class="form-title">買い物のデフォルト人数</h3>
+        <p class="setting-desc">献立から買い物リストに追加するときの初期人数</p>
+        <div class="field-row">
+          <input type="number" id="default-servings-input" placeholder="2" min="1" inputmode="numeric" class="field">
+          <button class="primary-btn" onclick="saveDefaultServings()" style="white-space:nowrap">保存</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="form-title">食材カテゴリ</h3>
+        <p class="setting-desc">買い物リスト・レシピ材料の分類に使われます</p>
+        <div id="cat-settings-list"></div>
+        <div class="field-row" style="margin-top:10px">
+          <input type="text" id="new-cat-input" placeholder="新しいカテゴリ名" class="field">
+          <button class="primary-btn" onclick="addCategory()" style="white-space:nowrap">追加</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="form-title">データ同期</h3>
+        <p class="setting-desc">現在の接続ID</p>
+        <div class="id-box" id="blob-id-display">—</div>
+        <div class="setting-actions">
+          <button class="ghost-btn full" onclick="copyURL()">🔗 URLをコピー</button>
+          <button class="ghost-btn full" onclick="manualFetch()">🔄 今すぐ同期</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="form-title">接続IDを変更</h3>
+        <p class="setting-desc">パートナーから共有されたURLのハッシュ部分（#以降）を入力</p>
+        <input type="text" id="new-blob-id" placeholder="例: 1234567890abcdef" class="field">
+        <button class="primary-btn full" onclick="changeBlobId()" style="margin-top:8px">接続する</button>
+      </div>
+
+      <div class="card">
+        <h3 class="form-title">新しいデータを作成</h3>
+        <p class="setting-desc">新しい保存先を作成します。現在のデータとの接続は切れます。</p>
+        <button class="accent-btn full" onclick="resetBlob()">新規作成</button>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- 下部ナビゲーション -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="menu" onclick="switchTab('menu', this)">
+      <span class="nav-icon">📅</span>
+      <span class="nav-label">献立</span>
+    </button>
+    <button class="nav-btn" data-tab="stock" onclick="switchTab('stock', this)">
+      <span class="nav-icon">🥦</span>
+      <span class="nav-label">在庫</span>
+    </button>
+    <button class="nav-btn" data-tab="shopping" onclick="switchTab('shopping', this)">
+      <span class="nav-icon">🛒</span>
+      <span class="nav-label">買い物</span>
+    </button>
+    <button class="nav-btn" data-tab="recipes" onclick="switchTab('recipes', this)">
+      <span class="nav-icon">📖</span>
+      <span class="nav-label">レシピ</span>
+    </button>
+    <button class="nav-btn" data-tab="settings" onclick="switchTab('settings', this)">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">設定</span>
+    </button>
+  </nav>
+
+  <!-- FAB群 -->
+  <button id="stock-fab"    class="fab hidden" onclick="openStockSheet()">＋</button>
+  <button id="shopping-fab" class="fab hidden" onclick="openShopSheet()">＋</button>
+
+  <!-- ===== 在庫追加ボトムシート ===== -->
+  <div id="stock-sheet-overlay" class="sheet-bg hidden" onclick="closeStockSheet()"></div>
+  <div id="stock-sheet" class="bottom-sheet hidden">
+    <div class="sheet-handle"></div>
+    <h3 id="stock-sheet-title">在庫を追加</h3>
+    <input type="hidden" id="stock-edit-id" value="">
+    <div class="field-group" style="margin-bottom:0">
+      <select id="stock-cat-select" class="field">
+        <option value="食材">食材</option>
+        <option value="調味料">調味料</option>
+        <option value="冷凍ストック">冷凍ストック</option>
+      </select>
+      <input type="text" id="stock-name" placeholder="名前（例：鶏もも肉）" class="field">
+      <div class="field-row">
+        <input type="text" id="stock-qty" placeholder="数量（例: 1/3）" inputmode="decimal" class="field half">
+        <select id="stock-unit" class="field half">
+          <optgroup label="重さ">
+            <option value="g">g</option><option value="kg">kg</option>
+          </optgroup>
+          <optgroup label="体積">
+            <option value="ml">ml</option><option value="L">L</option>
+            <option value="大さじ">大さじ</option><option value="小さじ">小さじ</option>
+            <option value="カップ">カップ</option>
+          </optgroup>
+          <optgroup label="個数">
+            <option value="個">個</option><option value="枚">枚</option>
+            <option value="本">本</option><option value="袋">袋</option>
+            <option value="箱">箱</option><option value="缶">缶</option>
+            <option value="パック">パック</option><option value="束">束</option>
+          </optgroup>
+          <optgroup label="その他">
+            <option value="少々">少々</option><option value="適量">適量</option>
+            <option value="—">—</option>
+          </optgroup>
+        </select>
+      </div>
+      <div>
+        <label class="date-label">消費期限</label>
+        <input type="date" id="stock-expiry" class="field">
+      </div>
+    </div>
+    <button class="primary-btn full" id="stock-sheet-btn" onclick="saveStockFromSheet()">追加する</button>
+  </div>
+
+  <!-- ===== 買い物アイテム追加シート ===== -->
+  <div id="shop-sheet-overlay" class="sheet-bg hidden" onclick="closeShopSheet()"></div>
+  <div id="shop-sheet" class="bottom-sheet hidden">
+    <div class="sheet-handle"></div>
+    <h3>アイテムを追加</h3>
+    <div class="field-group" style="margin-bottom:0">
+      <input type="text" id="shop-item" placeholder="商品名" class="field">
+      <div class="field-row">
+        <input type="text" id="shop-qty" placeholder="量（例: 1/3）" inputmode="decimal" class="field half">
+        <select id="shop-unit" class="field half">
+          <optgroup label="重さ"><option value="g">g</option><option value="kg">kg</option></optgroup>
+          <optgroup label="体積"><option value="ml">ml</option><option value="L">L</option><option value="大さじ">大さじ</option><option value="小さじ">小さじ</option><option value="カップ">カップ</option></optgroup>
+          <optgroup label="個数"><option value="個">個</option><option value="枚">枚</option><option value="本">本</option><option value="袋">袋</option><option value="箱">箱</option><option value="缶">缶</option><option value="パック">パック</option><option value="束">束</option></optgroup>
+          <optgroup label="その他"><option value="少々">少々</option><option value="適量">適量</option><option value="—">—</option></optgroup>
+        </select>
+      </div>
+      <select id="shop-category" class="field"></select>
+    </div>
+    <button class="primary-btn full" onclick="addShopItem()">追加する</button>
+  </div>
+
+  <!-- ===== レシピピッカーシート ===== -->
+  <div id="picker-overlay" class="sheet-bg hidden" onclick="closeRecipePicker()"></div>
+  <div id="recipe-picker" class="bottom-sheet hidden">
+    <div class="sheet-handle"></div>
+    <h3 id="picker-title">レシピを選ぶ</h3>
+    <div class="picker-cat-tabs" id="picker-cat-tabs"></div>
+    <div id="picker-recipe-grid" class="picker-grid"></div>
+    <button class="ghost-btn full" style="margin-top:8px" onclick="clearPickerSlot()">🗑 クリア</button>
+  </div>
+
+  <!-- ===== レシピ追加ボトムシート ===== -->
+  <div id="recipe-sheet-overlay" class="sheet-bg hidden" onclick="closeRecipeSheet()"></div>
+  <div id="recipe-sheet" class="bottom-sheet hidden">
+    <div class="sheet-handle"></div>
+    <h3>レシピを追加</h3>
+
+    <div class="r-section">
+      <input type="text" id="r-name" placeholder="レシピ名（例：肉じゃが）" class="field">
+      <div class="field-row" style="margin-top:8px">
+        <div class="field-col">
+          <label class="date-label">何人分</label>
+          <input type="number" id="r-servings" value="2" min="1" inputmode="numeric" class="field">
+        </div>
+        <div class="field-col">
+          <label class="date-label">調理時間（分）</label>
+          <input type="number" id="r-cook-time" placeholder="30" min="1" inputmode="numeric" class="field">
+        </div>
+        <div class="field-col">
+          <label class="date-label">保存期間</label>
+          <input type="text" id="r-storage" placeholder="冷蔵3日" class="field">
+        </div>
+      </div>
+    </div>
+
+    <div class="r-section">
+      <div class="r-section-title">カテゴリ</div>
+      <div id="r-category-btns" class="tap-btn-group"></div>
+      <input type="hidden" id="r-category" value="">
+    </div>
+
+    <div class="r-section">
+      <div class="r-section-title">材料</div>
+      <div id="temp-ingredients" class="temp-list"></div>
+      <div class="ing-add-form">
+        <input type="text" id="ing-name" placeholder="材料名" class="field">
+        <div class="field-row" style="margin-top:6px">
+          <input type="text" id="ing-qty" placeholder="量（例: 1/3）" inputmode="decimal" class="field" style="max-width:90px">
+          <select id="ing-unit" class="field">
+            <optgroup label="重さ">
+              <option value="g">g</option>
+              <option value="kg">kg</option>
+              <option value="mg">mg</option>
+            </optgroup>
+            <optgroup label="体積">
+              <option value="ml">ml</option>
+              <option value="L">L</option>
+              <option value="大さじ">大さじ</option>
+              <option value="小さじ">小さじ</option>
+              <option value="カップ">カップ</option>
+            </optgroup>
+            <optgroup label="個数">
+              <option value="個">個</option>
+              <option value="枚">枚</option>
+              <option value="本">本</option>
+              <option value="袋">袋</option>
+              <option value="箱">箱</option>
+              <option value="缶">缶</option>
+              <option value="パック">パック</option>
+              <option value="束">束</option>
+            </optgroup>
+            <optgroup label="その他">
+              <option value="少々">少々</option>
+              <option value="適量">適量</option>
+              <option value="—">—</option>
+            </optgroup>
+          </select>
+        </div>
+        <div id="ing-cat-btns" class="tap-btn-group" style="margin-top:6px"></div>
+        <input type="hidden" id="ing-cat" value="">
+        <button class="ghost-btn full" onclick="addTempIngredient()" style="margin-top:8px">＋ 材料を追加</button>
+      </div>
+    </div>
+
+    <div class="r-section">
+      <div class="r-section-title">手順</div>
+      <div id="temp-steps" class="temp-list"></div>
+      <textarea id="step-text" placeholder="手順を入力（例：玉ねぎを薄切りにする）" class="field textarea" rows="2"></textarea>
+      <button class="ghost-btn full" onclick="addTempStep()" style="margin-top:6px">＋ 手順を追加</button>
+    </div>
+
+    <button class="primary-btn full" onclick="saveRecipe()">保存する</button>
+  </div>
+
+  <!-- ===== 献立編集ボトムシート ===== -->
+  <div id="sheet-overlay" class="sheet-bg hidden" onclick="closeSheet()"></div>
+  <div id="meal-sheet" class="bottom-sheet hidden">
+    <div class="sheet-handle"></div>
+    <h3 id="sheet-date"></h3>
+
+    <div class="meal-editor" id="meal-editor-blocks"></div>
+
+    <button class="ghost-btn full" onclick="suggestMeals()">🎲 ランダム提案</button>
+    <button class="ghost-btn full" onclick="addMealDayToShopList()">🛒 全スロット一括追加</button>
+    <button class="primary-btn full" onclick="saveMeal()">保存する</button>
+  </div>
+
+  <!-- 初回セットアップ画面 -->
+  <div id="setup-overlay" class="setup-overlay-bg hidden">
+    <div class="setup-card">
+      <div class="setup-icon">🍽️</div>
+      <h2>初回セットアップ</h2>
+      <p>「データを作成」を押すと、このアプリ専用の保存先が作られます。完了後に表示されるURLをパートナーに共有してください。</p>
+      <button class="primary-btn full" onclick="setupBlob()" id="setup-btn">データを作成</button>
+      <p class="setup-note" id="setup-status"></p>
+    </div>
+  </div>
+
+  <!-- 同期ステータスバー -->
+  <div id="sync-bar" class="sync-bar hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
