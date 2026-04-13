@@ -18,18 +18,26 @@ function generateId() {
 async function fetchData() {
   if (IS_LOCAL) { loadLocal(); return; }
   const id = getBlobId();
+  if (!id) return;
   showSync('データを読み込み中…');
   try {
     const res = await fetch(`${STORE_API}/${id}`);
-    if (!res.ok) throw new Error();
+    // 404 = まだ一度も保存されていない新規ストア → エラーではない
+    if (res.status === 404) {
+      hideSync();
+      renderAll();
+      return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    const data = json.result || {};
+    const data = (json.result && typeof json.result === 'object') ? json.result : {};
     meals     = data.meals     || {};
     stocks    = data.stocks    || [];
     shopItems = data.shopItems || [];
     recipes   = data.recipes   || [];
     saveLocal(); // ローカルにもキャッシュ
-  } catch {
+  } catch(e) {
+    console.warn('Cloud fetch failed:', e);
     showSync('同期できませんでした（キャッシュを表示）', true);
     setTimeout(hideSync, 3000);
     loadLocalSilent(); // キャッシュから読む
@@ -61,10 +69,12 @@ async function pushData() {
   setTimeout(hideSync, 1500);
 }
 
-function setupBlob() {
+async function setupBlob() {
   const id = generateId();
   location.hash = id;
   document.getElementById('setup-overlay').classList.add('hidden');
+  // 初期データをクラウドに送信しておく（空でも送って存在を確立する）
+  await pushData();
   copyURL();
   showToast('セットアップ完了！URLをパートナーに共有してください');
 }
