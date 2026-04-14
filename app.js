@@ -20,29 +20,51 @@ async function fetchData() {
   const id = getBlobId();
   if (!id) return;
   showSync('データを読み込み中…');
+  let res;
   try {
-    const res = await fetch(`${STORE_API}/${id}`);
-    // 404 = まだ一度も保存されていない新規ストア → エラーではない
-    if (res.status === 404) {
-      hideSync();
-      renderAll();
-      return;
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const data = (json.result && typeof json.result === 'object') ? json.result : {};
-    meals     = data.meals     || {};
-    stocks    = data.stocks    || [];
-    shopItems = data.shopItems || [];
-    recipes   = data.recipes   || [];
-    saveLocal(); // ローカルにもキャッシュ
+    res = await fetch(`${STORE_API}/${id}`);
   } catch(e) {
-    console.warn('Cloud fetch failed:', e);
-    showSync('同期できませんでした（キャッシュを表示）', true);
-    setTimeout(hideSync, 3000);
-    loadLocalSilent(); // キャッシュから読む
+    // ネットワークエラー or CORS ブロック
+    const msg = `[読込] ネットワークエラー: ${e.message}`;
+    console.error(msg, e);
+    showSync(msg, true);
+    setTimeout(hideSync, 6000);
+    loadLocalSilent();
     return;
   }
+  // 404 = まだ一度も保存されていない新規ストア → エラーではない
+  if (res.status === 404) {
+    hideSync();
+    renderAll();
+    return;
+  }
+  if (!res.ok) {
+    let body = '';
+    try { body = await res.text(); } catch(_) {}
+    const msg = `[読込] HTTP ${res.status} ${res.statusText}${body ? ' / ' + body.slice(0,80) : ''}`;
+    console.error(msg);
+    showSync(msg, true);
+    setTimeout(hideSync, 6000);
+    loadLocalSilent();
+    return;
+  }
+  let json;
+  try {
+    json = await res.json();
+  } catch(e) {
+    const msg = `[読込] JSONパースエラー: ${e.message}`;
+    console.error(msg, e);
+    showSync(msg, true);
+    setTimeout(hideSync, 6000);
+    loadLocalSilent();
+    return;
+  }
+  const data = (json.result && typeof json.result === 'object') ? json.result : {};
+  meals     = data.meals     || {};
+  stocks    = data.stocks    || [];
+  shopItems = data.shopItems || [];
+  recipes   = data.recipes   || [];
+  saveLocal();
   hideSync();
   renderAll();
 }
@@ -52,17 +74,29 @@ async function pushData() {
   const id = getBlobId();
   if (!id) return;
   showSync('保存中…');
+  let res;
   try {
-    const res = await fetch(`${STORE_API}/${id}`, {
+    res = await fetch(`${STORE_API}/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ meals, stocks, shopItems, recipes })
     });
-    if (!res.ok) throw new Error();
-  } catch {
-    saveLocal(); // ローカルには保存しておく
-    showSync('クラウド保存に失敗しました', true);
-    setTimeout(hideSync, 3000);
+  } catch(e) {
+    saveLocal();
+    const msg = `[保存] ネットワークエラー: ${e.message}`;
+    console.error(msg, e);
+    showSync(msg, true);
+    setTimeout(hideSync, 6000);
+    return;
+  }
+  if (!res.ok) {
+    saveLocal();
+    let body = '';
+    try { body = await res.text(); } catch(_) {}
+    const msg = `[保存] HTTP ${res.status} ${res.statusText}${body ? ' / ' + body.slice(0,80) : ''}`;
+    console.error(msg);
+    showSync(msg, true);
+    setTimeout(hideSync, 6000);
     return;
   }
   showSync('保存しました ✓');
