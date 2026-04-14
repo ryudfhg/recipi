@@ -3,39 +3,52 @@ const IS_LOCAL = location.protocol === 'file:'
   || location.hostname === 'localhost'
   || location.hostname === '127.0.0.1';
 
-// ======== jsonstore.io API ========
-const STORE_API = 'https://www.jsonstore.io';
-
-function getBlobId() {
-  return location.hash.replace('#', '') || null;
-}
+// ======== Firebase Realtime Database API ========
+// ハッシュ形式: #{urlsafe_base64(firebaseUrl)}:{randomKey}
 
 function generateId() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)))
     .map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+function getRawHash() {
+  return location.hash.replace('#', '') || null;
+}
+
+function getFirebaseUrl() {
+  const hash = getRawHash();
+  if (!hash || !hash.includes(':')) return null;
+  const b64 = hash.split(':')[0];
+  try {
+    return atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+  } catch { return null; }
+}
+
+function getDataKey() {
+  const hash = getRawHash();
+  if (!hash) return null;
+  const idx = hash.indexOf(':');
+  return idx >= 0 ? hash.slice(idx + 1) : hash;
+}
+
 async function fetchData() {
   if (IS_LOCAL) { loadLocal(); return; }
-  const id = getBlobId();
-  if (!id) return;
+  const fbUrl = getFirebaseUrl();
+  const key   = getDataKey();
+  if (!fbUrl || !key) {
+    loadLocalSilent();
+    return;
+  }
   showSync('データを読み込み中…');
   let res;
   try {
-    res = await fetch(`${STORE_API}/${id}`);
+    res = await fetch(`${fbUrl}/${key}.json`);
   } catch(e) {
-    // ネットワークエラー or CORS ブロック
     const msg = `[読込] ネットワークエラー: ${e.message}`;
     console.error(msg, e);
     showSync(msg, true);
     setTimeout(hideSync, 6000);
     loadLocalSilent();
-    return;
-  }
-  // 404 = まだ一度も保存されていない新規ストア → エラーではない
-  if (res.status === 404) {
-    hideSync();
-    renderAll();
     return;
   }
   if (!res.ok) {
@@ -48,9 +61,9 @@ async function fetchData() {
     loadLocalSilent();
     return;
   }
-  let json;
+  let data;
   try {
-    json = await res.json();
+    data = await res.json();
   } catch(e) {
     const msg = `[読込] JSONパースエラー: ${e.message}`;
     console.error(msg, e);
@@ -59,26 +72,28 @@ async function fetchData() {
     loadLocalSilent();
     return;
   }
-  const data = (json.result && typeof json.result === 'object') ? json.result : {};
-  meals     = data.meals     || {};
-  stocks    = data.stocks    || [];
-  shopItems = data.shopItems || [];
-  recipes   = data.recipes   || [];
-  saveLocal();
+  if (data && typeof data === 'object') {
+    meals     = data.meals     || {};
+    stocks    = data.stocks    || [];
+    shopItems = data.shopItems || [];
+    recipes   = data.recipes   || [];
+    saveLocal();
+  }
   hideSync();
   renderAll();
 }
 
 async function pushData() {
   if (IS_LOCAL) { saveLocal(); return; }
-  const id = getBlobId();
-  if (!id) return;
+  const fbUrl = getFirebaseUrl();
+  const key   = getDataKey();
+  if (!fbUrl || !key) { saveLocal(); return; }
   showSync('保存中…');
   let res;
   try {
-    res = await fetch(`${STORE_API}/${id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
+    res = await fetch(`${fbUrl}/${key}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ meals, stocks, shopItems, recipes })
     });
   } catch(e) {
@@ -104,10 +119,21 @@ async function pushData() {
 }
 
 async function setupBlob() {
-  const id = generateId();
-  location.hash = id;
+  const urlInput = document.getElementById('firebase-url-input');
+  const fbUrl = (urlInput ? urlInput.value.trim() : '').replace(/\/$/, '');
+  if (!fbUrl) {
+    showToast('Firebase データベースURLを入力してください', 'error'); return;
+  }
+  if (!fbUrl.startsWith('https://')) {
+    showToast('https:// で始まるURLを入力してください', 'error'); return;
+  }
+  const btn = document.getElementById('setup-btn');
+  btn.disabled = true;
+  btn.textContent = '作成中…';
+  const key  = generateId();
+  const b64  = btoa(fbUrl).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  location.hash = `${b64}:${key}`;
   document.getElementById('setup-overlay').classList.add('hidden');
-  // 初期データをクラウドに送信しておく（空でも送って存在を確立する）
   await pushData();
   copyURL();
   showToast('セットアップ完了！URLをパートナーに共有してください');
@@ -1289,9 +1315,13 @@ function renderRecipes() {
 // ======== 設定タブ ========
 function updateSettingsView() {
   renderCatSettings();
-  const id    = getBlobId();
+  const fbUrl = getFirebaseUrl();
+  const key   = getDataKey();
   const names = getNames();
-  document.getElementById('blob-id-display').textContent = id || '（未接続）';
+  const display = fbUrl
+    ? `${fbUrl.replace('https://', '')} / key: ${key.slice(0, 8)}…`
+    : '（未接続）';
+  document.getElementById('blob-id-display').textContent = display;
   document.getElementById('p1-name-input').value = names.p1 === '自分'       ? '' : names.p1;
   document.getElementById('p2-name-input').value = names.p2 === 'パートナー' ? '' : names.p2;
   document.getElementById('default-servings-input').value = getDefaultServings();
@@ -1305,8 +1335,11 @@ async function manualFetch() {
 
 function changeBlobId() {
   const val = document.getElementById('new-blob-id').value.trim();
-  if (!val) { showToast('IDを入力してください', 'error'); return; }
-  location.hash = val;
+  if (!val) { showToast('共有URLを入力してください', 'error'); return; }
+  // フルURLでもハッシュ部分だけでも受け付ける
+  let hash = val.includes('#') ? val.split('#')[1] : val;
+  if (!hash) { showToast('URLが正しくありません', 'error'); return; }
+  location.hash = hash;
   document.getElementById('new-blob-id').value = '';
   fetchData();
   showToast('接続しました');
@@ -1358,7 +1391,7 @@ initCalendar();
 
 if (IS_LOCAL) {
   loadLocal();
-} else if (getBlobId()) {
+} else if (getFirebaseUrl()) {
   fetchData();
 } else {
   document.getElementById('setup-overlay').classList.remove('hidden');

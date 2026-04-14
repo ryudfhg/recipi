@@ -108,9 +108,9 @@
       </div>
 
       <div class="card">
-        <h3 class="form-title">接続IDを変更</h3>
-        <p class="setting-desc">パートナーから共有されたURLのハッシュ部分（#以降）を入力</p>
-        <input type="text" id="new-blob-id" placeholder="例: 1234567890abcdef" class="field">
+        <h3 class="form-title">共有URLで接続</h3>
+        <p class="setting-desc">パートナーから共有されたURLをそのまま貼り付け</p>
+        <input type="text" id="new-blob-id" placeholder="https://ryudfhg.github.io/recipi/#..." class="field">
         <button class="primary-btn full" onclick="changeBlobId()" style="margin-top:8px">接続する</button>
       </div>
 
@@ -328,8 +328,15 @@
     <div class="setup-card">
       <div class="setup-icon">🍽️</div>
       <h2>初回セットアップ</h2>
-      <p>「データを作成」を押すと、このアプリ専用の保存先が作られます。完了後に表示されるURLをパートナーに共有してください。</p>
-      <button class="primary-btn full" onclick="setupBlob()" id="setup-btn">データを作成</button>
+      <p>クラウド同期に <strong>Firebase Realtime Database（無料）</strong> を使います。</p>
+      <ol class="setup-steps">
+        <li><a href="https://console.firebase.google.com/" target="_blank" class="setup-link">console.firebase.google.com</a> でプロジェクト作成</li>
+        <li>左メニュー「Realtime Database」→「データベースを作成」→「テストモード」で開始</li>
+        <li>表示されたURLをコピーして下に貼り付け<br><small>例: https://xxx-default-rtdb.asia-southeast1.firebasedatabase.app</small></li>
+      </ol>
+      <input type="url" id="firebase-url-input" class="field"
+        placeholder="https://xxx-default-rtdb.firebaseio.com">
+      <button class="primary-btn full" onclick="setupBlob()" id="setup-btn" style="margin-top:12px">データを作成</button>
       <p class="setup-note" id="setup-status"></p>
     </div>
   </div>

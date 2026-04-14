@@ -849,15 +849,29 @@ select.field {
 }
 .setup-icon { font-size: 3rem; margin-bottom: 12px; }
 .setup-card h2 { font-size: 1.2rem; color: var(--green); margin-bottom: 12px; }
-.setup-card p  { font-size: .88rem; color: var(--muted); line-height: 1.6; margin-bottom: 20px; }
+.setup-card p  { font-size: .88rem; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
 .setup-note    { font-size: .8rem; color: var(--muted); margin-top: 12px; min-height: 20px; }
+.setup-steps {
+  text-align: left;
+  font-size: .83rem;
+  color: var(--text);
+  line-height: 1.8;
+  padding-left: 18px;
+  margin-bottom: 14px;
+}
+.setup-steps small { color: var(--muted); font-size: .75rem; }
+.setup-link { color: var(--green); }
 
 /* ======== 同期バー ======== */
 .sync-bar {
   position: fixed;
   top: var(--header-h); left: 0; right: 0;
   background: var(--green); color: white;
-  font-size: .8rem; text-align: center; padding: 5px;
+  font-size: .75rem; text-align: center;
+  padding: 5px 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
   z-index: 150;
 }
 .sync-bar.hidden { display: none; }
