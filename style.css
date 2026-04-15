@@ -483,6 +483,20 @@ select.field {
 .stock-group .stock-card:last-of-type  { border-radius: 0 0 14px 14px; border-bottom: none; }
 .stock-group .stock-card:only-of-type  { border-radius: 14px; border-bottom: none; }
 
+/* レシピグループ */
+.recipe-group { margin-bottom: 12px; }
+.recipe-group-label {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: .05em;
+  padding: 0 4px 6px;
+}
+.recipe-group .recipe-card { margin-bottom: 0; border-radius: 0; box-shadow: none; border-bottom: 1px solid #f0f0f0; }
+.recipe-group .recipe-card:first-child { border-radius: 14px 14px 0 0; }
+.recipe-group .recipe-card:last-child  { border-radius: 0 0 14px 14px; border-bottom: none; }
+.recipe-group .recipe-card:only-child  { border-radius: 14px; border-bottom: none; }
+
 /* ======== タップ選択ボタングループ ======== */
 .tap-btn-group {
   display: flex;
@@ -613,9 +627,16 @@ select.field {
   gap: 12px;
 }
 .recipe-header:active { background: #f8f8f8; }
-.recipe-header-left { flex: 1; min-width: 0; }
-.recipe-name { font-weight: 700; font-size: .95rem; display: block; margin-bottom: 5px; }
-.recipe-infos { display: flex; flex-wrap: wrap; gap: 5px; }
+.recipe-header-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.recipe-name { font-weight: 700; font-size: .95rem; }
+.recipe-infos { display: flex; flex-wrap: wrap; gap: 4px; }
 .recipe-info-chip {
   font-size: .72rem;
   background: var(--green-lt);
@@ -819,9 +840,13 @@ select.field {
   background: white;
   border: 1.5px solid var(--border);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 10px 14px;
   cursor: pointer;
   transition: all .15s;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .picker-card:active { background: var(--green-lt); }
 .picker-card.selected {
@@ -830,12 +855,11 @@ select.field {
 }
 .picker-card-name {
   font-weight: 700;
-  font-size: .95rem;
-  margin-bottom: 5px;
+  font-size: .9rem;
 }
 .picker-card-meta {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
   align-items: center;
 }

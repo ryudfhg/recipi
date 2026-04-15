@@ -235,18 +235,26 @@ function switchTab(name, btn) {
   document.getElementById('header-title').textContent = TITLES[name];
   document.getElementById('stock-fab').classList.toggle('hidden', name !== 'stock');
   document.getElementById('shopping-fab').classList.toggle('hidden', name !== 'shopping');
-  // 在庫タブ以外ではフィルターボタンとパネルを隠す
+  // フィルターボタン：在庫タブとレシピタブで表示
   const filterBtn = document.getElementById('filter-btn');
-  filterBtn.classList.toggle('hidden', name !== 'stock');
+  const showFilter = name === 'stock' || name === 'recipes';
+  filterBtn.classList.toggle('hidden', !showFilter);
   if (name !== 'stock') {
     document.getElementById('stock-filter-panel').classList.add('hidden');
-    filterBtn.classList.remove('active');
   }
+  if (name !== 'recipes') {
+    document.getElementById('recipe-filter-panel').classList.add('hidden');
+  }
+  if (!showFilter) filterBtn.classList.remove('active');
   if (name === 'settings') updateSettingsView();
 }
 
 function toggleFilterPanel() {
-  const panel = document.getElementById('stock-filter-panel');
+  // 現在アクティブなタブに対応するパネルを切り替え
+  const activeTab = document.querySelector('.tab.active');
+  const panelId = activeTab && activeTab.id === 'tab-recipes'
+    ? 'recipe-filter-panel' : 'stock-filter-panel';
+  const panel = document.getElementById(panelId);
   const btn   = document.getElementById('filter-btn');
   const isOpen = !panel.classList.contains('hidden');
   panel.classList.toggle('hidden', isOpen);
@@ -787,6 +795,25 @@ async function saveMeal() {
 // ======== 在庫 ========
 const DEFAULT_STOCK_CATS = ['食材', '調味料', '冷凍ストック'];
 let stockCatFilter    = 'all';
+let recipeCatFilter   = 'all';
+
+function filterRecipeCat(f, btn) {
+  recipeCatFilter = f;
+  document.querySelectorAll('#recipe-cat-filters .chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderRecipes();
+}
+
+function renderRecipeCatFilters() {
+  const container = document.getElementById('recipe-cat-filters');
+  if (!container) return;
+  const cats = getRecipeCategories();
+  container.innerHTML =
+    `<button class="chip ${recipeCatFilter === 'all' ? 'active' : ''}" onclick="filterRecipeCat('all',this)">すべて</button>`
+    + cats.map(c =>
+      `<button class="chip ${recipeCatFilter === c ? 'active' : ''}" onclick="filterRecipeCat('${esc(c)}',this)">${esc(c)}</button>`
+    ).join('');
+}
 let stockStatusFilter = 'all';
 
 function getStockCategories() {
@@ -1428,13 +1455,7 @@ async function addIngredientsToShopList(recipeId) {
   showToast(msgs.join('・') || '変化なし');
 }
 
-function renderRecipes() {
-  const list = document.getElementById('recipe-list');
-  if (!recipes.length) {
-    list.innerHTML = '<div class="empty-card">レシピがありません</div>';
-    return;
-  }
-  list.innerHTML = recipes.map(r => {
+function recipeCardHTML(r) {
     const ICON_CLOCK = `<svg style="width:12px;height:12px;vertical-align:middle;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>`;
     const ICON_BOX   = `<svg style="width:12px;height:12px;vertical-align:middle;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`;
     const ICON_TRASH = `<svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
@@ -1488,7 +1509,44 @@ function renderRecipes() {
         </div>
       ` : ''}
     </div>`;
-  }).join('');
+}
+
+function renderRecipes() {
+  const list = document.getElementById('recipe-list');
+  if (!recipes.length) {
+    list.innerHTML = '<div class="empty-card">レシピがありません</div>';
+    return;
+  }
+
+  const cats = getRecipeCategories();
+  const filtered = recipeCatFilter === 'all'
+    ? recipes
+    : recipes.filter(r => (r.category || 'その他') === recipeCatFilter);
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-card">該当するレシピがありません</div>';
+    return;
+  }
+
+  if (recipeCatFilter === 'all') {
+    // カテゴリごとにグループ化
+    const groups = {};
+    cats.forEach(c => { groups[c] = []; });
+    filtered.forEach(r => {
+      const c = r.category || 'その他';
+      if (groups[c]) groups[c].push(r);
+      else { groups[c] = [r]; }
+    });
+    list.innerHTML = cats.map(cat => {
+      if (!groups[cat] || !groups[cat].length) return '';
+      return `<div class="recipe-group">
+        <div class="recipe-group-label">${esc(cat)}</div>
+        ${groups[cat].map(r => recipeCardHTML(r)).join('')}
+      </div>`;
+    }).join('');
+  } else {
+    list.innerHTML = filtered.map(r => recipeCardHTML(r)).join('');
+  }
 }
 
 // ======== 設定タブ ========
@@ -1580,6 +1638,7 @@ function showToast(msg, type = '') {
 // ======== 初期化 ========
 populateShopCatSelect();
 renderStockCatFilters();
+renderRecipeCatFilters();
 initCalendar();
 
 if (IS_LOCAL) {
