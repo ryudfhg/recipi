@@ -13,15 +13,22 @@
   --text:     #2d2d2d;
   --muted:    #888;
   --header-h: 52px;
-  --nav-h:    64px;
+  --nav-h:    74px;
 }
 
-html, body {
+html {
   height: 100%;
   font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
   background: var(--bg);
   color: var(--text);
   font-size: 15px;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  min-height: 100%;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--text);
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -41,6 +48,40 @@ html, body {
   z-index: 200;
   box-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
+.header-filter-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,.2);
+  border: none;
+  color: white;
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.header-filter-btn.active { background: rgba(255,255,255,.4); }
+.header-filter-btn.hidden { display: none; }
+
+/* ======== 在庫フィルターパネル ======== */
+.stock-filter-panel {
+  background: white;
+  border-radius: 0 0 14px 14px;
+  padding: 10px 12px 8px;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+.stock-filter-panel.hidden { display: none; }
+.filter-section-label {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.stock-filter-panel .filter-row { margin-bottom: 8px; }
+.stock-filter-panel .filter-row:last-child { margin-bottom: 0; }
 
 /* ======== メイン ======== */
 .app-main {
@@ -51,6 +92,8 @@ html, body {
 
 .tab { display: none; padding: 12px; }
 .tab.active { display: block; }
+/* 献立タブは左右余白ゼロ */
+#tab-menu { padding: 0; }
 
 /* ======== 下部ナビ ======== */
 .bottom-nav {
@@ -80,7 +123,8 @@ html, body {
   padding: 6px 0;
 }
 .nav-btn.active { color: var(--green); }
-.nav-icon  { font-size: 1.3rem; line-height: 1; }
+.nav-icon  { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; }
+.nav-icon svg { width: 24px; height: 24px; }
 .nav-label { font-size: .65rem; font-weight: 600; }
 
 /* ======== カレンダー ======== */
@@ -88,17 +132,17 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 4px 10px;
+  padding: 6px 10px 8px;
 }
 .cal-nav span { font-size: 1.05rem; font-weight: 700; color: var(--green); }
 
 .icon-btn {
-  width: 38px; height: 38px;
+  width: 36px; height: 36px;
   border: none;
   background: var(--green-lt);
   color: var(--green);
   border-radius: 50%;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: background .15s;
@@ -109,10 +153,10 @@ html, body {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
-  font-size: .72rem;
+  font-size: .68rem;
   font-weight: 700;
   color: var(--muted);
-  padding-bottom: 6px;
+  padding: 0 0 4px;
 }
 .cal-weekdays span:first-child { color: #e53935; }
 .cal-weekdays span:last-child  { color: #1976d2; }
@@ -120,53 +164,61 @@ html, body {
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 2px;
 }
 
 .cal-cell {
   background: white;
-  border-radius: 10px;
-  min-height: 64px;
-  padding: 5px 4px 4px;
+  border-radius: 6px;
+  min-height: 35px;
+  padding: 3px 2px 3px;
   cursor: pointer;
   transition: box-shadow .15s;
-  overflow: hidden;
 }
 .cal-cell:active   { box-shadow: 0 0 0 2px var(--green); }
 .cal-cell.today    { box-shadow: 0 0 0 2px var(--green); }
 .cal-cell.other-month { opacity: .35; }
 
-.cal-day { font-size: .78rem; font-weight: 700; line-height: 1; margin-bottom: 3px; }
+.cal-day { font-size: .72rem; font-weight: 700; line-height: 1; margin-bottom: 2px; text-align: center; }
 .cal-cell.sunday   .cal-day { color: #e53935; }
 .cal-cell.saturday .cal-day { color: #1976d2; }
 .cal-cell.holiday  .cal-day { color: #e53935; }
 
 .cal-meal-preview {
-  font-size: .58rem;
+  font-size: .53rem;
   color: var(--green-dk);
   background: var(--green-lt);
-  border-radius: 4px;
+  border-radius: 3px;
   padding: 2px 3px;
-  margin-top: 2px;
+  margin-top: 1px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.3;
+}
+.preview-header {
   display: flex;
   align-items: center;
   gap: 2px;
-  line-height: 1.3;
-  overflow: hidden;
 }
-.preview-icon { flex-shrink: 0; font-size: .6rem; }
+.preview-icon { flex-shrink: 0; display: flex; align-items: center; }
+.preview-icon .slot-icon { width: 9px; height: 9px; }
+.preview-label {
+  font-weight: 700;
+  font-size: .52rem;
+  flex-shrink: 0;
+}
 .preview-name {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-all;
+  padding-left: 2px;
+  color: var(--text);
 }
 
-/* 出席バッジ（人名の頭文字） */
+/* 出席バッジ（欠席者のみ表示） */
 .att-badge {
-  font-size: .52rem;
+  font-size: .42rem;
   font-weight: 700;
-  width: 13px; height: 13px;
+  width: 10px; height: 10px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
@@ -174,7 +226,7 @@ html, body {
 }
 .att-p1  { background: var(--green);  color: white; }
 .att-p2  { background: var(--orange); color: white; }
-.att-off { background: #e0e0e0; color: #aaa; }
+.att-off { background: #bdbdbd; color: white; }
 
 /* ======== カード ======== */
 .card {
@@ -291,7 +343,7 @@ select.field {
 .chip.active { background: var(--green); border-color: var(--green); color: white; font-weight: 700; }
 
 /* ======== アイテムリスト ======== */
-.item-list { display: flex; flex-direction: column; gap: 8px; }
+.item-list { display: flex; flex-direction: column; gap: 0; }
 
 .empty-card {
   text-align: center;
@@ -305,70 +357,73 @@ select.field {
 /* 在庫カード */
 .stock-card {
   background: white;
-  border-radius: 14px;
-  padding: 12px 14px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  border-bottom: 1px solid #f0f0f0;
+  padding: 2px 10px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
+.stock-card:last-child { border-bottom: none; }
 .stock-info  { flex: 1; min-width: 0; cursor: pointer; }
-.stock-name  { font-weight: 700; font-size: .93rem; margin-bottom: 2px; }
-.stock-meta  { font-size: .75rem; color: var(--muted); }
+.stock-name  { font-weight: 700; font-size: .88rem; line-height: 1.3; }
+.stock-meta  { font-size: .72rem; color: var(--muted); }
 
 .stock-qty-ctrl {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   background: var(--bg);
-  border-radius: 10px;
-  padding: 4px 6px;
+  border-radius: 8px;
+  padding: 3px 5px;
+  flex-shrink: 0;
 }
 .qty-btn {
-  width: 26px; height: 26px;
+  width: 22px; height: 22px;
   border: none;
   background: white;
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: 6px;
+  font-size: .9rem;
   font-weight: 700;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  box-shadow: 0 1px 2px rgba(0,0,0,.1);
   color: var(--green);
   transition: background .1s;
 }
 .qty-btn:active { background: var(--green-lt); }
 .qty-val {
-  font-size: .88rem;
+  font-size: .82rem;
   font-weight: 700;
-  min-width: 36px;
+  min-width: 30px;
   text-align: center;
 }
-.qty-val small { font-size: .7rem; font-weight: 400; color: var(--muted); margin-left: 1px; }
+.qty-val small { font-size: .65rem; font-weight: 400; color: var(--muted); margin-left: 1px; }
 
+/* 横並びアクション */
 .stock-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  flex-shrink: 0;
 }
 .icon-action-btn {
   background: none;
   border: none;
-  font-size: 1rem;
+  font-size: .95rem;
   cursor: pointer;
-  padding: 2px;
+  padding: 4px 3px;
   line-height: 1;
 }
 
-.badge { font-size: .72rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+.badge { font-size: .65rem; font-weight: 700; padding: 2px 6px; border-radius: 8px; white-space: nowrap; }
 .badge-ok       { background: var(--green-lt); color: var(--green-dk); }
 .badge-low      { background: #fff3e0; color: #e65100; }
 .badge-expiring { background: #fce4ec; color: #b71c1c; }
 
 .del-btn {
   background: none; border: none;
-  font-size: 1.2rem; cursor: pointer; color: #ccc; padding: 4px; line-height: 1;
+  font-size: 1.05rem; cursor: pointer; color: #ccc; padding: 4px 3px; line-height: 1;
 }
 .del-btn:active { color: var(--red); }
 
@@ -411,9 +466,9 @@ select.field {
 .fab.hidden    { display: none; }
 
 /* ======== 在庫グループ ======== */
-.stock-group { margin-bottom: 16px; }
+.stock-group { margin-bottom: 8px; }
 .stock-group-label {
-  font-size: .75rem;
+  font-size: .72rem;
   font-weight: 700;
   color: var(--muted);
   letter-spacing: .05em;
@@ -525,6 +580,24 @@ select.field {
 .cat-settings-item:last-child { border-bottom: none; }
 .cat-settings-name { flex: 1; font-size: .9rem; }
 
+/* 設定タブ — データ・接続設定トグル */
+.settings-toggle-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 4px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .85rem;
+  cursor: pointer;
+  text-align: left;
+  margin-top: 4px;
+}
+.settings-toggle-btn:active { opacity: .7; }
+#data-settings-section.hidden { display: none; }
+
 /* ======== レシピカード ======== */
 .recipe-card {
   background: white;
@@ -625,12 +698,11 @@ select.field {
 
 /* ======== 献立 複数レシピ ======== */
 .meal-recipes-col {
-  flex: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
   align-items: center;
-  min-width: 0;
+  margin-bottom: 8px;
 }
 .recipe-tag {
   display: inline-flex;
@@ -673,6 +745,38 @@ select.field {
   white-space: nowrap;
 }
 .add-recipe-btn:active { opacity: .7; }
+
+/* ======== 買い物追加 結果パネル ======== */
+.add-result-panel {
+  background: var(--green-lt);
+  border: 1px solid #b2dfdb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  font-size: .82rem;
+}
+.result-row { margin-bottom: 6px; }
+.result-row:last-child { margin-bottom: 0; }
+.result-label {
+  font-weight: 600;
+  color: var(--green-dk);
+  display: block;
+  margin-bottom: 3px;
+}
+.result-items { display: flex; flex-wrap: wrap; gap: 4px; }
+.result-item {
+  background: white;
+  border: 1px solid #b2dfdb;
+  border-radius: 12px;
+  padding: 2px 8px;
+  color: var(--text);
+}
+.result-stock {
+  color: var(--muted);
+  font-size: .8rem;
+  align-self: center;
+}
+.result-none { color: var(--muted); font-size: .8rem; }
 
 /* ======== レシピピッカー（献立シートより前面に表示） ======== */
 #picker-overlay { z-index: 450; }
@@ -787,14 +891,15 @@ select.field {
   border-radius: 12px;
   padding: 10px 12px;
 }
-.meal-row {
-  display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;
+.meal-slot-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
 }
-.meal-row .meal-icon,
-.meal-row .meal-label-txt { margin-top: 5px; }
-.meal-icon       { font-size: 1.1rem; flex-shrink: 0; }
-.meal-label-txt  { font-size: .85rem; font-weight: 700; color: var(--muted); width: 18px; flex-shrink: 0; }
-.meal-row .field { flex: 1; padding: 9px 10px; font-size: .88rem; }
+.meal-icon { flex-shrink: 0; display: flex; align-items: center; color: var(--green-dk); }
+.meal-icon .slot-icon { width: 18px; height: 18px; }
+.meal-label-txt { font-size: .9rem; font-weight: 700; color: var(--text); }
 
 /* 出席トグル */
 .attend-row { display: flex; gap: 8px; }
@@ -831,6 +936,13 @@ select.field {
   padding: 10px 12px; font-size: .8rem; font-family: monospace; word-break: break-all; margin-bottom: 12px;
 }
 .setting-actions { display: flex; flex-direction: column; gap: 8px; }
+.icon-btn-txt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.icon-btn-txt svg { width: 17px; height: 17px; flex-shrink: 0; }
 
 /* ======== セットアップ画面 ======== */
 .setup-overlay-bg {

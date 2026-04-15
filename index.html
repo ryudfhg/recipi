@@ -4,12 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>献立管理</title>
+  <link rel="apple-touch-icon" href="icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="献立">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <header class="app-header">
     <span id="header-title">献立</span>
+    <button id="filter-btn" class="header-filter-btn hidden" onclick="toggleFilterPanel()">
+      <span id="filter-btn-icon">☰</span>
+    </button>
   </header>
 
   <main class="app-main">
@@ -30,16 +37,15 @@
 
     <!-- ===== 在庫タブ ===== -->
     <section id="tab-stock" class="tab">
-      <div id="cat-filters" class="filter-row">
-        <button class="chip active" onclick="filterStockCat('all',this)">すべて</button>
-        <button class="chip" onclick="filterStockCat('食材',this)">食材</button>
-        <button class="chip" onclick="filterStockCat('調味料',this)">調味料</button>
-        <button class="chip" onclick="filterStockCat('冷凍ストック',this)">冷凍</button>
-      </div>
-      <div id="status-filters" class="filter-row">
-        <button class="chip active" onclick="filterStockStatus('all',this)">すべて</button>
-        <button class="chip" onclick="filterStockStatus('low',this)">残り少ない</button>
-        <button class="chip" onclick="filterStockStatus('expiring',this)">期限間近</button>
+      <div id="stock-filter-panel" class="stock-filter-panel hidden">
+        <div class="filter-section-label">カテゴリ</div>
+        <div id="cat-filters" class="filter-row"></div>
+        <div class="filter-section-label">状態</div>
+        <div id="status-filters" class="filter-row">
+          <button class="chip active" onclick="filterStockStatus('all',this)">すべて</button>
+          <button class="chip" onclick="filterStockStatus('low',this)">残り少ない</button>
+          <button class="chip" onclick="filterStockStatus('expiring',this)">期限間近</button>
+        </div>
       </div>
       <div id="stock-list" class="item-list"></div>
     </section>
@@ -98,26 +104,58 @@
       </div>
 
       <div class="card">
-        <h3 class="form-title">データ同期</h3>
-        <p class="setting-desc">現在の接続ID</p>
-        <div class="id-box" id="blob-id-display">—</div>
-        <div class="setting-actions">
-          <button class="ghost-btn full" onclick="copyURL()">🔗 URLをコピー</button>
-          <button class="ghost-btn full" onclick="manualFetch()">🔄 今すぐ同期</button>
+        <h3 class="form-title">在庫カテゴリ</h3>
+        <p class="setting-desc">在庫管理の分類に使われます</p>
+        <div id="stock-cat-settings-list"></div>
+        <div class="field-row" style="margin-top:10px">
+          <input type="text" id="new-stock-cat-input" placeholder="新しいカテゴリ名" class="field">
+          <button class="primary-btn" onclick="addStockCategory()" style="white-space:nowrap">追加</button>
         </div>
       </div>
 
       <div class="card">
-        <h3 class="form-title">共有URLで接続</h3>
-        <p class="setting-desc">パートナーから共有されたURLをそのまま貼り付け</p>
-        <input type="text" id="new-blob-id" placeholder="https://ryudfhg.github.io/recipi/#..." class="field">
-        <button class="primary-btn full" onclick="changeBlobId()" style="margin-top:8px">接続する</button>
+        <h3 class="form-title">レシピカテゴリ</h3>
+        <p class="setting-desc">レシピの分類に使われます</p>
+        <div id="recipe-cat-settings-list"></div>
+        <div class="field-row" style="margin-top:10px">
+          <input type="text" id="new-recipe-cat-input" placeholder="新しいカテゴリ名" class="field">
+          <button class="primary-btn" onclick="addRecipeCategory()" style="white-space:nowrap">追加</button>
+        </div>
       </div>
 
-      <div class="card">
-        <h3 class="form-title">新しいデータを作成</h3>
-        <p class="setting-desc">新しい保存先を作成します。現在のデータとの接続は切れます。</p>
-        <button class="accent-btn full" onclick="resetBlob()">新規作成</button>
+      <button class="settings-toggle-btn" onclick="toggleDataSettings()">
+        <span id="data-settings-toggle-label">▶ データ・接続設定</span>
+      </button>
+
+      <div id="data-settings-section" class="hidden">
+        <div class="card">
+          <h3 class="form-title">データ同期</h3>
+          <p class="setting-desc">現在の接続ID</p>
+          <div class="id-box" id="blob-id-display">—</div>
+          <div class="setting-actions">
+            <button class="ghost-btn full icon-btn-txt" onclick="copyURL()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              URLをコピー
+            </button>
+            <button class="ghost-btn full icon-btn-txt" onclick="manualFetch()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+              今すぐ同期
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="form-title">共有URLで接続</h3>
+          <p class="setting-desc">パートナーから共有されたURLをそのまま貼り付け</p>
+          <input type="text" id="new-blob-id" placeholder="https://ryudfhg.github.io/recipi/#..." class="field">
+          <button class="primary-btn full" onclick="changeBlobId()" style="margin-top:8px">接続する</button>
+        </div>
+
+        <div class="card">
+          <h3 class="form-title">新しいデータを作成</h3>
+          <p class="setting-desc">新しい保存先を作成します。現在のデータとの接続は切れます。</p>
+          <button class="accent-btn full" onclick="resetBlob()">新規作成</button>
+        </div>
       </div>
 
     </section>
@@ -127,23 +165,55 @@
   <!-- 下部ナビゲーション -->
   <nav class="bottom-nav">
     <button class="nav-btn active" data-tab="menu" onclick="switchTab('menu', this)">
-      <span class="nav-icon">📅</span>
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+      </span>
       <span class="nav-label">献立</span>
     </button>
     <button class="nav-btn" data-tab="stock" onclick="switchTab('stock', this)">
-      <span class="nav-icon">🥦</span>
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="2" width="14" height="20" rx="2"/>
+          <line x1="5" y1="10" x2="19" y2="10"/>
+          <line x1="9" y1="6" x2="9" y2="6" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+      </span>
       <span class="nav-label">在庫</span>
     </button>
     <button class="nav-btn" data-tab="shopping" onclick="switchTab('shopping', this)">
-      <span class="nav-icon">🛒</span>
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <path d="M16 10a4 4 0 0 1-8 0"/>
+        </svg>
+      </span>
       <span class="nav-label">買い物</span>
     </button>
     <button class="nav-btn" data-tab="recipes" onclick="switchTab('recipes', this)">
-      <span class="nav-icon">📖</span>
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          <line x1="9" y1="7" x2="15" y2="7"/>
+          <line x1="9" y1="11" x2="13" y2="11"/>
+        </svg>
+      </span>
       <span class="nav-label">レシピ</span>
     </button>
     <button class="nav-btn" data-tab="settings" onclick="switchTab('settings', this)">
-      <span class="nav-icon">⚙️</span>
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </span>
       <span class="nav-label">設定</span>
     </button>
   </nav>
@@ -159,11 +229,7 @@
     <h3 id="stock-sheet-title">在庫を追加</h3>
     <input type="hidden" id="stock-edit-id" value="">
     <div class="field-group" style="margin-bottom:0">
-      <select id="stock-cat-select" class="field">
-        <option value="食材">食材</option>
-        <option value="調味料">調味料</option>
-        <option value="冷凍ストック">冷凍ストック</option>
-      </select>
+      <select id="stock-cat-select" class="field"></select>
       <input type="text" id="stock-name" placeholder="名前（例：鶏もも肉）" class="field">
       <div class="field-row">
         <input type="text" id="stock-qty" placeholder="数量（例: 1/3）" inputmode="decimal" class="field half">
@@ -318,7 +384,7 @@
 
     <div class="meal-editor" id="meal-editor-blocks"></div>
 
-    <button class="ghost-btn full" onclick="suggestMeals()">🎲 ランダム提案</button>
+    <div id="add-result-panel" class="add-result-panel hidden"></div>
     <button class="ghost-btn full" onclick="addMealDayToShopList()">🛒 全スロット一括追加</button>
     <button class="primary-btn full" onclick="saveMeal()">保存する</button>
   </div>
