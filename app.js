@@ -15,6 +15,7 @@ const IS_LOCAL = location.protocol === 'file:'
 
 // ======== Firebase Realtime Database API ========
 // ハッシュ形式: #{urlsafe_base64(firebaseUrl)}:{randomKey}
+// 接続情報は localStorage にも保存し、ハッシュが消えても復元できるようにする
 
 function generateId() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -25,8 +26,8 @@ function getRawHash() {
   return location.hash.replace('#', '') || null;
 }
 
-function getFirebaseUrl() {
-  const hash = getRawHash();
+// ハッシュからFirebase URLを解析
+function parseFirebaseUrlFromHash(hash) {
   if (!hash || !hash.includes(':')) return null;
   const b64 = hash.split(':')[0];
   try {
@@ -34,11 +35,45 @@ function getFirebaseUrl() {
   } catch { return null; }
 }
 
-function getDataKey() {
-  const hash = getRawHash();
+// ハッシュからkeyを解析
+function parseKeyFromHash(hash) {
   if (!hash) return null;
   const idx = hash.indexOf(':');
   return idx >= 0 ? hash.slice(idx + 1) : hash;
+}
+
+// 接続情報をlocalStorageに保存（ハッシュが消えても復元できる）
+function saveConnectionInfo(fbUrl, key) {
+  localStorage.setItem('fbUrl', fbUrl);
+  localStorage.setItem('fbKey', key);
+  // ハッシュも維持（URLシェア用）
+  const b64 = btoa(fbUrl).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  if (location.hash !== `#${b64}:${key}`) {
+    history.replaceState(null, '', `#${b64}:${key}`);
+  }
+}
+
+function clearConnectionInfo() {
+  localStorage.removeItem('fbUrl');
+  localStorage.removeItem('fbKey');
+  localStorage.removeItem('fbHash'); // 旧形式互換
+}
+
+// 有効なFirebase URLを取得（ハッシュ → localStorage の順で探す）
+function getFirebaseUrl() {
+  const hash = getRawHash();
+  const fromHash = parseFirebaseUrlFromHash(hash);
+  if (fromHash) return fromHash;
+  return localStorage.getItem('fbUrl') || null;
+}
+
+// 有効なkeyを取得（ハッシュ → localStorage の順で探す）
+function getDataKey() {
+  const hash = getRawHash();
+  if (parseFirebaseUrlFromHash(hash)) {
+    return parseKeyFromHash(hash);
+  }
+  return localStorage.getItem('fbKey') || null;
 }
 
 // 最後に同期したデータのJSON文字列（変更検知用）
@@ -187,10 +222,8 @@ async function setupBlob() {
   const btn = document.getElementById('setup-btn');
   btn.disabled = true;
   btn.textContent = '作成中…';
-  const key  = generateId();
-  const b64  = btoa(fbUrl).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-  location.hash = `${b64}:${key}`;
-  localStorage.setItem('fbHash', getRawHash());
+  const key = generateId();
+  saveConnectionInfo(fbUrl, key);
   document.getElementById('setup-overlay').classList.add('hidden');
   await pushData();
   copyURL();
@@ -1588,7 +1621,9 @@ function changeBlobId() {
   let hash = val.includes('#') ? val.split('#')[1] : val;
   if (!hash) { showToast('URLが正しくありません', 'error'); return; }
   location.hash = hash;
-  localStorage.setItem('fbHash', hash);
+  const restoredUrl = parseFirebaseUrlFromHash(hash);
+  const restoredKey = parseKeyFromHash(hash);
+  if (restoredUrl && restoredKey) saveConnectionInfo(restoredUrl, restoredKey);
   document.getElementById('new-blob-id').value = '';
   fetchData();
   showToast('接続しました');
@@ -1598,7 +1633,7 @@ function changeBlobId() {
 function resetBlob() {
   if (!confirm('新しいデータを作成しますか？\n現在のデータとの接続は切れます。')) return;
   location.hash = '';
-  localStorage.removeItem('fbHash');
+  clearConnectionInfo();
   meals = {}; stocks = []; shopItems = []; recipes = [];
   document.getElementById('setup-overlay').classList.remove('hidden');
   const btn = document.getElementById('setup-btn');
@@ -1644,13 +1679,16 @@ initCalendar();
 if (IS_LOCAL) {
   loadLocal();
 } else {
-  // ハッシュがなければ localStorage から復元を試みる
-  if (!getFirebaseUrl()) {
-    const saved = localStorage.getItem('fbHash');
-    if (saved) location.replace(location.pathname + location.search + '#' + saved);
-  }
+  // getFirebaseUrl() は ハッシュ → localStorage の順で探すので
+  // ハッシュが消えていても localStorage から復元される
   if (getFirebaseUrl()) {
-    localStorage.setItem('fbHash', getRawHash());
+    // ハッシュにある場合は localStorage も最新に更新しておく
+    const h = getRawHash();
+    if (h) {
+      const u = parseFirebaseUrlFromHash(h);
+      const k = parseKeyFromHash(h);
+      if (u && k) saveConnectionInfo(u, k);
+    }
     fetchData();
   } else {
     document.getElementById('setup-overlay').classList.remove('hidden');
