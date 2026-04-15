@@ -41,6 +41,21 @@ function getDataKey() {
   return idx >= 0 ? hash.slice(idx + 1) : hash;
 }
 
+// 最後に同期したデータのJSON文字列（変更検知用）
+let lastSyncJSON = null;
+// 自動ポーリング用タイマー
+let autoSyncTimer = null;
+const AUTO_SYNC_MS = 30 * 1000; // 30秒
+
+function applyData(data) {
+  meals     = data.meals     || {};
+  stocks    = data.stocks    || [];
+  shopItems = data.shopItems || [];
+  recipes   = data.recipes   || [];
+  lastSyncJSON = JSON.stringify({ meals, stocks, shopItems, recipes });
+  saveLocal();
+}
+
 async function fetchData() {
   if (IS_LOCAL) { loadLocal(); return; }
   const fbUrl = getFirebaseUrl();
@@ -83,14 +98,44 @@ async function fetchData() {
     return;
   }
   if (data && typeof data === 'object') {
-    meals     = data.meals     || {};
-    stocks    = data.stocks    || [];
-    shopItems = data.shopItems || [];
-    recipes   = data.recipes   || [];
-    saveLocal();
+    applyData(data);
   }
   hideSync();
   renderAll();
+  startAutoSync();
+}
+
+// バックグラウンドポーリング：変化があった時だけ再レンダリング
+async function pollSync() {
+  if (!getFirebaseUrl()) return;
+  const fbUrl = getFirebaseUrl();
+  const key   = getDataKey();
+  try {
+    const res = await fetch(`${fbUrl}/${key}.json`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || typeof data !== 'object') return;
+    const newJSON = JSON.stringify({
+      meals:     data.meals     || {},
+      stocks:    data.stocks    || [],
+      shopItems: data.shopItems || [],
+      recipes:   data.recipes   || [],
+    });
+    if (newJSON === lastSyncJSON) return; // 変化なし
+    applyData(data);
+    renderAll();
+    showToast('データを更新しました');
+  } catch { /* ネットワーク不調は無視 */ }
+}
+
+function startAutoSync() {
+  stopAutoSync();
+  if (IS_LOCAL) return;
+  autoSyncTimer = setInterval(pollSync, AUTO_SYNC_MS);
+}
+
+function stopAutoSync() {
+  if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
 }
 
 async function pushData() {
@@ -124,6 +169,8 @@ async function pushData() {
     setTimeout(hideSync, 6000);
     return;
   }
+  // 自分の保存内容をキャッシュ（ポーリングで自己更新を誤検知しないよう）
+  lastSyncJSON = JSON.stringify({ meals, stocks, shopItems, recipes });
   showSync('保存しました ✓');
   setTimeout(hideSync, 1500);
 }
@@ -1323,6 +1370,9 @@ async function saveRecipe() {
 }
 
 async function deleteRecipe(id) {
+  const r = recipes.find(r => r.id === id);
+  if (!r) return;
+  if (!confirm(`「${r.name}」を削除しますか？`)) return;
   recipes = recipes.filter(r => r.id !== id);
   renderRecipes();
   await pushData();
@@ -1337,6 +1387,7 @@ function toggleRecipe(id) {
 async function addIngredientsToShopList(recipeId) {
   const r = recipes.find(r => r.id === recipeId);
   if (!r || !r.ingredients.length) { showToast('材料が登録されていません', 'error'); return; }
+  if (!confirm(`「${r.name}」の材料を買い物リストに追加しますか？`)) return;
 
   const buyServings    = getDefaultServings();
   const recipeServings = r.servings || 2;
@@ -1384,15 +1435,23 @@ function renderRecipes() {
     return;
   }
   list.innerHTML = recipes.map(r => {
+    const ICON_CLOCK = `<svg style="width:12px;height:12px;vertical-align:middle;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>`;
+    const ICON_BOX   = `<svg style="width:12px;height:12px;vertical-align:middle;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`;
+    const ICON_TRASH = `<svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+    const ICON_SHOP  = `<svg style="width:15px;height:15px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`;
+    const ICON_UP    = `<svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>`;
+    const ICON_DOWN  = `<svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+
     const cookLabel = (() => {
       const m = parseInt(r.cookTime);
       if (!m) return '';
-      return m < 60 ? `⏱ ${m}分` : `⏱ ${Math.floor(m/60)}時間${m%60 ? m%60+'分' : ''}`;
+      const txt = m < 60 ? `${m}分` : `${Math.floor(m/60)}時間${m%60 ? m%60+'分' : ''}`;
+      return `${ICON_CLOCK} ${txt}`;
     })();
     const infos = [
-      r.servings    ? `${r.servings}人分`    : '',
+      r.servings    ? `${r.servings}人分`           : '',
       cookLabel,
-      r.storageTime ? `📦 ${r.storageTime}` : '',
+      r.storageTime ? `${ICON_BOX} ${r.storageTime}` : '',
     ].filter(Boolean);
 
     return `
@@ -1400,11 +1459,11 @@ function renderRecipes() {
       <div class="recipe-header" onclick="toggleRecipe(${r.id})">
         <div class="recipe-header-left">
           <span class="recipe-name">${esc(r.name)}</span>
-          ${infos.length ? `<div class="recipe-infos">${infos.map(t => `<span class="recipe-info-chip">${esc(t)}</span>`).join('')}</div>` : ''}
+          ${infos.length ? `<div class="recipe-infos">${infos.map(t => `<span class="recipe-info-chip">${t}</span>`).join('')}</div>` : ''}
         </div>
         <div class="recipe-header-right">
-          <button class="del-btn" onclick="event.stopPropagation();deleteRecipe(${r.id})">🗑</button>
-          <span class="recipe-arrow">${r.open ? '▲' : '▼'}</span>
+          <button class="del-btn" onclick="event.stopPropagation();deleteRecipe(${r.id})">${ICON_TRASH}</button>
+          <span class="recipe-arrow">${r.open ? ICON_UP : ICON_DOWN}</span>
         </div>
       </div>
       ${r.open ? `
@@ -1425,7 +1484,7 @@ function renderRecipes() {
                 ${r.steps.map(s => `<li>${esc(s.text)}</li>`).join('')}
               </ol>
             </div>` : ''}
-          <button class="accent-btn full" onclick="addIngredientsToShopList(${r.id})">🛒 材料を買い物リストへ</button>
+          <button class="accent-btn full icon-btn-txt" onclick="addIngredientsToShopList(${r.id})">${ICON_SHOP} 材料を買い物リストへ</button>
         </div>
       ` : ''}
     </div>`;
