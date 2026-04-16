@@ -31,7 +31,15 @@ function parseFirebaseUrlFromHash(hash) {
   if (!hash || !hash.includes(':')) return null;
   const b64 = hash.split(':')[0];
   try {
-    return atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+    // URL-safe base64 → 標準base64 + パディング補完
+    let std = b64.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = std.length % 4;
+    if (pad === 2) std += '==';
+    else if (pad === 3) std += '=';
+    const decoded = atob(std);
+    // https:// で始まる場合のみ有効とみなす
+    if (!decoded.startsWith('https://')) return null;
+    return decoded;
   } catch { return null; }
 }
 
@@ -1001,7 +1009,7 @@ function getStatus(s) {
     const diff = (new Date(s.expiry) - today) / 86400000;
     if (diff <= 3) return 'expiring';
   }
-  if (s.qty <= 1) return 'low';
+  if (s.qty < 1) return 'low';
   return 'ok';
 }
 
@@ -1072,8 +1080,8 @@ function stockCardHTML(s) {
     </div>
     <div class="stock-actions">
       <span class="badge ${badgeCls}">${badgeTxt}</span>
-      <button class="icon-action-btn" onclick="addStockToShopList(${s.id})" title="買い物リストへ">🛒</button>
-      <button class="del-btn" onclick="deleteStock(${s.id})">🗑</button>
+      <button class="icon-action-btn" onclick="addStockToShopList(${s.id})" title="買い物リストへ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></button>
+      <button class="del-btn" onclick="deleteStock(${s.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
     </div>
   </div>`;
 }
@@ -1599,7 +1607,7 @@ function updateSettingsView() {
   const fbUrl = getFirebaseUrl();
   const key   = getDataKey();
   const names = getNames();
-  const display = fbUrl
+  const display = (fbUrl && key)
     ? `${fbUrl.replace('https://', '')} / key: ${key.slice(0, 8)}…`
     : '（未接続）';
   document.getElementById('blob-id-display').textContent = display;
