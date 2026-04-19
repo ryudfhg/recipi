@@ -452,15 +452,16 @@ select.field {
 .category-label { font-size: .78rem; font-weight: 700; color: var(--muted); padding: 0 4px 4px; }
 .shop-card {
   background: white;
-  border-radius: 14px;
-  padding: 14px 16px;
+  border-radius: 10px;
+  padding: 8px 14px;
   box-shadow: 0 1px 4px rgba(0,0,0,.06);
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 10px;
   transition: opacity .2s;
+  margin-bottom: 2px;
 }
 .shop-card.checked { opacity: .5; }
 .shop-card.checked .shop-name { text-decoration: line-through; }
-.shop-card input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--green); cursor: pointer; flex-shrink: 0; }
+.shop-card input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--green); cursor: pointer; flex-shrink: 0; }
 .shop-name { flex: 1; font-size: .95rem; font-weight: 500; }
 .shop-qty  { font-size: .82rem; color: var(--muted); }
 
@@ -796,6 +797,7 @@ select.field {
   margin-bottom: 8px;
   font-size: .82rem;
 }
+.add-result-panel.hidden { display: none; }
 .result-row { margin-bottom: 6px; }
 .result-row:last-child { margin-bottom: 0; }
 .result-label {
