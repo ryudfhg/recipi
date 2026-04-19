@@ -689,6 +689,21 @@ function saveDefaultServings() {
 }
 
 // 分数・小数文字列 → 数値。失敗時は NaN
+// 分数ショートカット：入力欄が空なら直接セット、数値が入っていれば + して表示
+function appendFrac(inputId, frac) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const cur = el.value.trim();
+  if (!cur) {
+    el.value = frac;
+  } else {
+    const sum = toNum(cur) + toNum(frac);
+    if (!isNaN(sum)) el.value = fmtQty(sum);
+    else el.value = frac;
+  }
+  el.focus();
+}
+
 function toNum(str) {
   if (!str && str !== 0) return NaN;
   const s = String(str).trim();

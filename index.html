@@ -235,29 +235,36 @@
     <div class="field-group" style="margin-bottom:0">
       <select id="stock-cat-select" class="field"></select>
       <input type="text" id="stock-name" placeholder="名前（例：鶏もも肉）" class="field">
-      <div class="field-row">
-        <input type="text" id="stock-qty" placeholder="数量（例: 1/3）" inputmode="decimal" class="field half">
-        <select id="stock-unit" class="field half">
-          <optgroup label="重さ">
-            <option value="g">g</option><option value="kg">kg</option>
-          </optgroup>
-          <optgroup label="体積">
-            <option value="ml">ml</option><option value="L">L</option>
-            <option value="大さじ">大さじ</option><option value="小さじ">小さじ</option>
-            <option value="カップ">カップ</option>
-          </optgroup>
-          <optgroup label="個数">
-            <option value="個">個</option><option value="枚">枚</option>
-            <option value="本">本</option><option value="袋">袋</option>
-            <option value="箱">箱</option><option value="缶">缶</option>
-            <option value="パック">パック</option><option value="束">束</option>
-          </optgroup>
-          <optgroup label="その他">
-            <option value="少々">少々</option><option value="適量">適量</option>
-            <option value="—">—</option>
-          </optgroup>
-        </select>
+      <div class="frac-input-wrap">
+        <input type="text" id="stock-qty" placeholder="数量（例: 1/3）" inputmode="text" class="field">
+        <div class="frac-chips">
+          <button type="button" class="frac-chip" onclick="appendFrac('stock-qty','1/2')">½</button>
+          <button type="button" class="frac-chip" onclick="appendFrac('stock-qty','1/3')">⅓</button>
+          <button type="button" class="frac-chip" onclick="appendFrac('stock-qty','2/3')">⅔</button>
+          <button type="button" class="frac-chip" onclick="appendFrac('stock-qty','1/4')">¼</button>
+          <button type="button" class="frac-chip" onclick="appendFrac('stock-qty','3/4')">¾</button>
+        </div>
       </div>
+      <select id="stock-unit" class="field">
+        <optgroup label="重さ">
+          <option value="g">g</option><option value="kg">kg</option>
+        </optgroup>
+        <optgroup label="体積">
+          <option value="ml">ml</option><option value="L">L</option>
+          <option value="大さじ">大さじ</option><option value="小さじ">小さじ</option>
+          <option value="カップ">カップ</option>
+        </optgroup>
+        <optgroup label="個数">
+          <option value="個">個</option><option value="枚">枚</option>
+          <option value="本">本</option><option value="袋">袋</option>
+          <option value="箱">箱</option><option value="缶">缶</option>
+          <option value="パック">パック</option><option value="束">束</option>
+        </optgroup>
+        <optgroup label="その他">
+          <option value="少々">少々</option><option value="適量">適量</option>
+          <option value="—">—</option>
+        </optgroup>
+      </select>
       <div>
         <label class="date-label">消費期限</label>
         <input type="date" id="stock-expiry" class="field">
@@ -273,15 +280,22 @@
     <h3>アイテムを追加</h3>
     <div class="field-group" style="margin-bottom:0">
       <input type="text" id="shop-item" placeholder="商品名" class="field">
-      <div class="field-row">
-        <input type="text" id="shop-qty" placeholder="量（例: 1/3）" inputmode="decimal" class="field half">
-        <select id="shop-unit" class="field half">
-          <optgroup label="重さ"><option value="g">g</option><option value="kg">kg</option></optgroup>
-          <optgroup label="体積"><option value="ml">ml</option><option value="L">L</option><option value="大さじ">大さじ</option><option value="小さじ">小さじ</option><option value="カップ">カップ</option></optgroup>
-          <optgroup label="個数"><option value="個">個</option><option value="枚">枚</option><option value="本">本</option><option value="袋">袋</option><option value="箱">箱</option><option value="缶">缶</option><option value="パック">パック</option><option value="束">束</option></optgroup>
-          <optgroup label="その他"><option value="少々">少々</option><option value="適量">適量</option><option value="—">—</option></optgroup>
-        </select>
+      <div class="frac-input-wrap">
+        <input type="text" id="shop-qty" placeholder="量（例: 1/3）" inputmode="text" class="field">
+        <div class="frac-chips">
+          <button type="button" class="frac-chip" onclick="appendFrac('shop-qty','1/2')">½</button>
+          <button type="button" class="frac-chip" onclick="appendFrac('shop-qty','1/3')">⅓</button>
+          <button type="button" class="frac-chip" onclick="appendFrac('shop-qty','2/3')">⅔</button>
+          <button type="button" class="frac-chip" onclick="appendFrac('shop-qty','1/4')">¼</button>
+          <button type="button" class="frac-chip" onclick="appendFrac('shop-qty','3/4')">¾</button>
+        </div>
       </div>
+      <select id="shop-unit" class="field">
+        <optgroup label="重さ"><option value="g">g</option><option value="kg">kg</option></optgroup>
+        <optgroup label="体積"><option value="ml">ml</option><option value="L">L</option><option value="大さじ">大さじ</option><option value="小さじ">小さじ</option><option value="カップ">カップ</option></optgroup>
+        <optgroup label="個数"><option value="個">個</option><option value="枚">枚</option><option value="本">本</option><option value="袋">袋</option><option value="箱">箱</option><option value="缶">缶</option><option value="パック">パック</option><option value="束">束</option></optgroup>
+        <optgroup label="その他"><option value="少々">少々</option><option value="適量">適量</option><option value="—">—</option></optgroup>
+      </select>
       <select id="shop-category" class="field"></select>
     </div>
     <button class="primary-btn full" onclick="addShopItem()">追加する</button>
@@ -333,8 +347,17 @@
       <div id="temp-ingredients" class="temp-list"></div>
       <div class="ing-add-form">
         <input type="text" id="ing-name" placeholder="材料名" class="field">
+        <div class="frac-input-wrap" style="margin-top:6px">
+          <input type="text" id="ing-qty" placeholder="量（例: 1/3）" inputmode="text" class="field">
+          <div class="frac-chips">
+            <button type="button" class="frac-chip" onclick="appendFrac('ing-qty','1/2')">½</button>
+            <button type="button" class="frac-chip" onclick="appendFrac('ing-qty','1/3')">⅓</button>
+            <button type="button" class="frac-chip" onclick="appendFrac('ing-qty','2/3')">⅔</button>
+            <button type="button" class="frac-chip" onclick="appendFrac('ing-qty','1/4')">¼</button>
+            <button type="button" class="frac-chip" onclick="appendFrac('ing-qty','3/4')">¾</button>
+          </div>
+        </div>
         <div class="field-row" style="margin-top:6px">
-          <input type="text" id="ing-qty" placeholder="量（例: 1/3）" inputmode="decimal" class="field" style="max-width:90px">
           <select id="ing-unit" class="field">
             <optgroup label="重さ">
               <option value="g">g</option>

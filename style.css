@@ -274,6 +274,20 @@ select.field {
 .field-row { display: flex; gap: 8px; }
 .half { flex: 1; }
 
+.frac-input-wrap { display: flex; flex-direction: column; gap: 4px; }
+.frac-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.frac-chip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: .85rem;
+  cursor: pointer;
+  color: var(--text);
+  line-height: 1.4;
+}
+.frac-chip:active { background: var(--green); color: #fff; border-color: var(--green); }
+
 .date-label {
   font-size: .78rem;
   color: var(--muted);
