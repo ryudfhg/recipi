@@ -301,6 +301,21 @@
     <button class="primary-btn full" onclick="addShopItem()">追加する</button>
   </div>
 
+  <!-- ===== 全画面レシピプレビュー ===== -->
+  <div id="recipe-preview-screen" class="recipe-preview-screen hidden">
+    <div class="rp-header">
+      <button class="rp-back-btn" onclick="closeRecipePreview()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        戻る
+      </button>
+      <span class="rp-title" id="rp-title"></span>
+    </div>
+    <div class="rp-tabs-wrap">
+      <div class="rp-tabs" id="rp-tabs"></div>
+    </div>
+    <div class="rp-content" id="rp-content"></div>
+  </div>
+
   <!-- ===== レシピピッカーシート ===== -->
   <div id="picker-overlay" class="sheet-bg hidden" onclick="closeRecipePicker()"></div>
   <div id="recipe-picker" class="bottom-sheet hidden">

@@ -588,7 +588,7 @@ function getMealSlotNames(slot) {
 function renderSlotRecipeTags(slot, nameArr) {
   if (!nameArr.length) return '';
   return nameArr.map((n, i) =>
-    `<span class="recipe-tag">${esc(n)}<button class="recipe-tag-del" onclick="removeRecipeFromSlot('${slot}',${i})">✕</button></span>`
+    `<span class="recipe-tag"><span class="recipe-tag-name" onclick="openRecipePreview('${slot}',${i})">${esc(n)}</span><button class="recipe-tag-del" onclick="removeRecipeFromSlot('${slot}',${i})">✕</button></span>`
   ).join('');
 }
 
@@ -627,7 +627,7 @@ function buildMealEditorBlocks(key, names) {
           ${renderSlotRecipeTags(slot, m.names)}
           <button class="add-recipe-btn" onclick="openRecipePicker('${slot}')">＋ レシピを追加</button>
         </div>
-        <div id="meal-recipe-viewer-${slot}">${renderRecipeViewer(slot, m.names)}</div>
+
         <div class="servings-row-slot">
           <label class="servings-slot-label">🛒</label>
           <input type="number" id="servings-${slot}" min="1" inputmode="numeric"
@@ -665,18 +665,42 @@ function toggleMealBlock(slot) {
   chevron.textContent = isOpen ? '▶' : '▼';
 }
 
-// レシピビューア（タブ付き）をHTMLとして返す
-function renderRecipeViewer(slot, names) {
-  const found = (names || []).filter(n => recipes.find(r => r.name === n));
-  if (!found.length) return '';
-  const tabs = found.map((n, i) =>
-    `<button class="rv-tab${i === 0 ? ' active' : ''}" onclick="showRecipeTab('${slot}',${i})">${esc(n)}</button>`
+// ======== 全画面レシピプレビュー ========
+let rpSlot = null;
+
+function openRecipePreview(slot, initialIdx) {
+  rpSlot = slot;
+  const el = document.getElementById(`meal-names-${slot}`);
+  const names = el ? JSON.parse(el.dataset.values || '[]') : [];
+  const slotLabel = { morning: '朝飯', noon: '昼飯', night: '夕飯' }[slot] || '';
+
+  document.getElementById('rp-title').textContent = slotLabel;
+
+  // タブ生成
+  const tabsEl = document.getElementById('rp-tabs');
+  tabsEl.innerHTML = names.map((n, i) =>
+    `<button class="rp-tab${i === initialIdx ? ' active' : ''}" onclick="switchRpTab(${i})">${esc(n)}</button>`
   ).join('');
-  const panels = found.map((n, i) => {
+
+  // パネル生成
+  const contentEl = document.getElementById('rp-content');
+  contentEl.innerHTML = names.map((n, i) => {
     const r = recipes.find(r => r.name === n);
-    return `<div class="rv-panel${i === 0 ? '' : ' hidden'}" id="rv-panel-${slot}-${i}">${r ? recipeViewHTML(r) : ''}</div>`;
+    return `<div class="rp-panel${i === initialIdx ? '' : ' hidden'}" id="rp-panel-${i}">${r ? recipeViewHTML(r) : '<p class="rv-empty">レシピが見つかりません</p>'}</div>`;
   }).join('');
-  return `<div class="recipe-viewer"><div class="rv-tabs">${tabs}</div>${panels}</div>`;
+
+  document.getElementById('recipe-preview-screen').classList.remove('hidden');
+}
+
+function closeRecipePreview() {
+  document.getElementById('recipe-preview-screen').classList.add('hidden');
+  rpSlot = null;
+}
+
+function switchRpTab(idx) {
+  document.querySelectorAll('.rp-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  document.querySelectorAll('.rp-panel').forEach((p, i) => p.classList.toggle('hidden', i !== idx));
+  document.getElementById('rp-content').scrollTop = 0;
 }
 
 function recipeViewHTML(r) {
@@ -692,22 +716,13 @@ function recipeViewHTML(r) {
   return ings + steps;
 }
 
-function showRecipeTab(slot, idx) {
-  const viewer = document.getElementById(`meal-recipe-viewer-${slot}`);
-  if (!viewer) return;
-  viewer.querySelectorAll('.rv-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
-  viewer.querySelectorAll('.rv-panel').forEach((p, i) => p.classList.toggle('hidden', i !== idx));
-}
-
-// レシピタグ＋ビューアを一括更新
+// レシピタグとヘッダープレビューを一括更新
 function refreshMealSlotUI(slot) {
   const el = document.getElementById(`meal-names-${slot}`);
   if (!el) return;
   const arr = JSON.parse(el.dataset.values || '[]');
   el.innerHTML = renderSlotRecipeTags(slot, arr) +
     `<button class="add-recipe-btn" onclick="openRecipePicker('${slot}')">＋ レシピを追加</button>`;
-  const viewer = document.getElementById(`meal-recipe-viewer-${slot}`);
-  if (viewer) viewer.innerHTML = renderRecipeViewer(slot, arr);
   const preview = document.getElementById(`meal-preview-${slot}`);
   if (preview) preview.textContent = arr.length ? arr.join('・') : '';
 }
@@ -906,7 +921,9 @@ async function saveMeal() {
     noon:    getMealSlotNames('noon'),
     night:   getMealSlotNames('night'),
   };
-  const hasAny = Object.values(slotsNames).some(arr => arr.length > 0);
+  const hasAny = ['morning','noon','night'].some(slot =>
+    slotsNames[slot].length > 0 || !sheetAttend[slot].p1 || !sheetAttend[slot].p2
+  );
 
   if (hasAny) {
     meals[editingKey] = {};
