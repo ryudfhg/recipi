@@ -689,6 +689,9 @@ function openRecipePreview(slot, initialIdx) {
     return `<div class="rp-panel${i === initialIdx ? '' : ' hidden'}" id="rp-panel-${i}">${r ? recipeViewHTML(r) : '<p class="rv-empty">レシピが見つかりません</p>'}</div>`;
   }).join('');
 
+  // 献立シートを先に閉じてからプレビューを全面表示
+  document.getElementById('sheet-overlay').classList.add('hidden');
+  document.getElementById('meal-sheet').classList.add('hidden');
   document.getElementById('recipe-preview-screen').classList.remove('hidden');
 }
 
