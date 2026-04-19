@@ -278,6 +278,20 @@ function hideSync() {
   document.getElementById('sync-bar').classList.add('hidden');
 }
 
+// ======== 買い物アクションシート ========
+function toggleShopActionSheet() {
+  const sheet = document.getElementById('shop-action-sheet');
+  const overlay = document.getElementById('shop-action-overlay');
+  const isHidden = sheet.classList.contains('hidden');
+  sheet.classList.toggle('hidden', !isHidden);
+  overlay.classList.toggle('hidden', !isHidden);
+}
+
+function closeShopActionSheet() {
+  document.getElementById('shop-action-sheet')?.classList.add('hidden');
+  document.getElementById('shop-action-overlay')?.classList.add('hidden');
+}
+
 // ======== タブ切り替え ========
 const TITLES = { menu: '献立', stock: '在庫管理', shopping: '買い物リスト', recipes: 'レシピ', settings: '設定' };
 
@@ -300,6 +314,9 @@ function switchTab(name, btn) {
     document.getElementById('recipe-filter-panel').classList.add('hidden');
   }
   if (!showFilter) filterBtn.classList.remove('active');
+  // 買い物アクションボタン：買い物タブのみ表示
+  document.getElementById('shop-action-btn').classList.toggle('hidden', name !== 'shopping');
+  if (name !== 'shopping') closeShopActionSheet();
   if (name === 'settings') updateSettingsView();
 }
 
@@ -859,6 +876,8 @@ function applyNeededToShopList(neededMap) {
   const addedItems = [];
   let skipped = 0;
   Object.values(neededMap).forEach(item => {
+    // 調味料カテゴリは献立からの追加対象外
+    if ((item.cat || '') === '調味料') return;
     const inStock = stocks
       .filter(s => s.name === item.name && (s.unit || '') === item.unit)
       .reduce((sum, s) => sum + (toNum(String(s.qty)) || 0), 0);
@@ -1301,6 +1320,7 @@ async function toggleShopItem(id) {
 }
 
 async function clearChecked() {
+  closeShopActionSheet();
   const before = shopItems.length;
   shopItems = shopItems.filter(i => !i.checked);
   renderShopItems();
@@ -1308,7 +1328,27 @@ async function clearChecked() {
   showToast(before !== shopItems.length ? `${before - shopItems.length}件を削除しました` : '削除するアイテムがありません');
 }
 
+async function addCheckedToStock() {
+  closeShopActionSheet();
+  const bought = shopItems.filter(i => i.checked);
+  if (!bought.length) { showToast('チェック済みのアイテムがありません', 'error'); return; }
+  bought.forEach(i => {
+    const existing = stocks.find(s => s.name === i.name && (s.unit || '') === (i.unit || ''));
+    if (existing) {
+      existing.qty = (toNum(String(existing.qty)) || 0) + (toNum(i.qty) || 1);
+    } else {
+      stocks.push({ id: Date.now() + Math.random(), name: i.name, qty: toNum(i.qty) || 1, unit: i.unit || '', expiry: '', cat: i.cat || '' });
+    }
+  });
+  shopItems = shopItems.filter(i => !i.checked);
+  renderStocks();
+  renderShopItems();
+  await pushData();
+  showToast(`${bought.length}件を在庫に追加しました`);
+}
+
 async function moveToStock() {
+  closeShopActionSheet();
   const bought = shopItems.filter(i => i.checked);
   if (bought.length) {
     bought.forEach(i => {

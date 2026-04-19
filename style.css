@@ -919,6 +919,20 @@ select.field {
 }
 .bottom-sheet.hidden { display: none; }
 
+/* 買い物アクションシート */
+.shop-action-sheet { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+.shop-action-item {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; padding: 14px 4px;
+  background: none; border: none;
+  font-size: 1rem; color: var(--text);
+  text-align: left; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.shop-action-item:last-child { border-bottom: none; }
+.shop-action-item:active { background: var(--bg); }
+.shop-action-item svg { flex-shrink: 0; color: var(--green); }
+
 .sheet-handle {
   width: 40px; height: 4px;
   background: #ddd; border-radius: 2px;
