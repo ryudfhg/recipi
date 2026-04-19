@@ -939,11 +939,70 @@ select.field {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-bottom: 8px;
 }
+.meal-slot-toggle { cursor: pointer; user-select: none; }
+.meal-slot-toggle:active { opacity: .7; }
+.meal-block-body { margin-top: 10px; }
+.meal-block-body.hidden { display: none; }
+
+.meal-header-preview {
+  flex: 1;
+  font-size: .78rem;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.meal-block-chevron {
+  font-size: .72rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
 .meal-icon { flex-shrink: 0; display: flex; align-items: center; color: var(--green-dk); }
 .meal-icon .slot-icon { width: 18px; height: 18px; }
 .meal-label-txt { font-size: .9rem; font-weight: 700; color: var(--text); }
+
+/* レシピビューア */
+.recipe-viewer {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.rv-tabs {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.rv-tab {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.rv-tab.active { color: var(--green); border-bottom-color: var(--green); }
+.rv-panel { padding: 10px 12px; }
+.rv-panel.hidden { display: none; }
+.rv-section-title {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin: 8px 0 4px;
+}
+.rv-section-title:first-child { margin-top: 0; }
+.rv-empty { font-size: .82rem; color: var(--muted); margin: 4px 0; }
 
 /* 出席トグル */
 .attend-row { display: flex; gap: 8px; }

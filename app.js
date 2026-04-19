@@ -549,17 +549,20 @@ function cellHTML(date, otherMonth) {
   let preview = '';
   ['morning','noon','night'].forEach(slot => {
     const m = getMealSlot(key, slot);
-    if (!m.names.length) return;
+    // レシピなし かつ 両者とも「要る」なら表示不要
+    if (!m.names.length && m.p1 && m.p2) return;
     const b1 = !m.p1 ? `<span class="att-badge att-off">${p1Initial}</span>` : '';
     const b2 = !m.p2 ? `<span class="att-badge att-off">${p2Initial}</span>` : '';
-    const nameDisp = m.names[0] + (m.names.length > 1 ? ` +${m.names.length - 1}` : '');
+    const nameDisp = m.names.length
+      ? m.names[0] + (m.names.length > 1 ? ` +${m.names.length - 1}` : '')
+      : '';
     preview += `<div class="cal-meal-preview">
       <div class="preview-header">
         <span class="preview-icon">${SVG[slot]}</span>
         <span class="preview-label">${slotLabels[slot]}</span>
         ${b1}${b2}
       </div>
-      <div class="preview-name">${esc(nameDisp)}</div>
+      ${nameDisp ? `<div class="preview-name">${esc(nameDisp)}</div>` : ''}
     </div>`;
   });
 
@@ -595,8 +598,7 @@ function removeRecipeFromSlot(slot, index) {
   const arr = JSON.parse(el.dataset.values || '[]');
   arr.splice(index, 1);
   el.dataset.values = JSON.stringify(arr);
-  el.innerHTML = renderSlotRecipeTags(slot, arr) +
-    `<button class="add-recipe-btn" onclick="openRecipePicker('${slot}')">＋ レシピを追加</button>`;
+  refreshMealSlotUI(slot);
 }
 
 function buildMealEditorBlocks(key, names) {
@@ -611,32 +613,38 @@ function buildMealEditorBlocks(key, names) {
   container.innerHTML = slotDefs.map(({ slot, icon, label }) => {
     const m = getMealSlot(key, slot);
     const namesJson = esc(JSON.stringify(m.names));
+    const previewTxt = m.names.length ? esc(m.names.join('・')) : '';
     return `
-    <div class="meal-block">
-      <div class="meal-slot-header">
+    <div class="meal-block" id="meal-block-${slot}">
+      <div class="meal-slot-header meal-slot-toggle" onclick="toggleMealBlock('${slot}')">
         <span class="meal-icon">${icon}</span>
         <span class="meal-label-txt">${label}</span>
+        <span class="meal-header-preview" id="meal-preview-${slot}">${previewTxt}</span>
+        <span class="meal-block-chevron" id="meal-chevron-${slot}">▶</span>
       </div>
-      <div class="meal-recipes-col" id="meal-names-${slot}" data-values="${namesJson}">
-        ${renderSlotRecipeTags(slot, m.names)}
-        <button class="add-recipe-btn" onclick="openRecipePicker('${slot}')">＋ レシピを追加</button>
-      </div>
-      <div class="servings-row-slot">
-        <label class="servings-slot-label">🛒</label>
-        <input type="number" id="servings-${slot}" min="1" inputmode="numeric"
-          class="field servings-slot-input" value="${defaultServ}">
-        <span class="servings-slot-unit">人分</span>
-        <button class="servings-slot-add-btn" onclick="addSlotToShopList('${slot}')">買い物リストに追加</button>
-      </div>
-      <div class="attend-row">
-        <button class="attend-btn ${m.p1 ? 'on' : 'off'}" id="attend-${slot}-p1" onclick="toggleAttend('${slot}','p1')">
-          <span class="attend-name" id="label-${slot}-p1">${esc(names.p1)}</span>
-          <span class="attend-state">${m.p1 ? '要る' : 'いらない'}</span>
-        </button>
-        <button class="attend-btn ${m.p2 ? 'on' : 'off'}" id="attend-${slot}-p2" onclick="toggleAttend('${slot}','p2')">
-          <span class="attend-name" id="label-${slot}-p2">${esc(names.p2)}</span>
-          <span class="attend-state">${m.p2 ? '要る' : 'いらない'}</span>
-        </button>
+      <div class="meal-block-body hidden" id="meal-block-body-${slot}">
+        <div class="meal-recipes-col" id="meal-names-${slot}" data-values="${namesJson}">
+          ${renderSlotRecipeTags(slot, m.names)}
+          <button class="add-recipe-btn" onclick="openRecipePicker('${slot}')">＋ レシピを追加</button>
+        </div>
+        <div id="meal-recipe-viewer-${slot}">${renderRecipeViewer(slot, m.names)}</div>
+        <div class="servings-row-slot">
+          <label class="servings-slot-label">🛒</label>
+          <input type="number" id="servings-${slot}" min="1" inputmode="numeric"
+            class="field servings-slot-input" value="${defaultServ}">
+          <span class="servings-slot-unit">人分</span>
+          <button class="servings-slot-add-btn" onclick="addSlotToShopList('${slot}')">買い物リストに追加</button>
+        </div>
+        <div class="attend-row">
+          <button class="attend-btn ${m.p1 ? 'on' : 'off'}" id="attend-${slot}-p1" onclick="toggleAttend('${slot}','p1')">
+            <span class="attend-name" id="label-${slot}-p1">${esc(names.p1)}</span>
+            <span class="attend-state">${m.p1 ? '要る' : 'いらない'}</span>
+          </button>
+          <button class="attend-btn ${m.p2 ? 'on' : 'off'}" id="attend-${slot}-p2" onclick="toggleAttend('${slot}','p2')">
+            <span class="attend-name" id="label-${slot}-p2">${esc(names.p2)}</span>
+            <span class="attend-state">${m.p2 ? '要る' : 'いらない'}</span>
+          </button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -646,6 +654,62 @@ function buildMealEditorBlocks(key, names) {
     const m = getMealSlot(key, slot);
     sheetAttend[slot] = { p1: m.p1, p2: m.p2 };
   });
+}
+
+function toggleMealBlock(slot) {
+  const body    = document.getElementById(`meal-block-body-${slot}`);
+  const chevron = document.getElementById(`meal-chevron-${slot}`);
+  if (!body) return;
+  const isOpen = !body.classList.contains('hidden');
+  body.classList.toggle('hidden', isOpen);
+  chevron.textContent = isOpen ? '▶' : '▼';
+}
+
+// レシピビューア（タブ付き）をHTMLとして返す
+function renderRecipeViewer(slot, names) {
+  const found = (names || []).filter(n => recipes.find(r => r.name === n));
+  if (!found.length) return '';
+  const tabs = found.map((n, i) =>
+    `<button class="rv-tab${i === 0 ? ' active' : ''}" onclick="showRecipeTab('${slot}',${i})">${esc(n)}</button>`
+  ).join('');
+  const panels = found.map((n, i) => {
+    const r = recipes.find(r => r.name === n);
+    return `<div class="rv-panel${i === 0 ? '' : ' hidden'}" id="rv-panel-${slot}-${i}">${r ? recipeViewHTML(r) : ''}</div>`;
+  }).join('');
+  return `<div class="recipe-viewer"><div class="rv-tabs">${tabs}</div>${panels}</div>`;
+}
+
+function recipeViewHTML(r) {
+  const ings = (r.ingredients || []).length
+    ? `<div class="rv-section-title">材料（${r.servings || 2}人分）</div>
+       <ul class="ing-list">${(r.ingredients || []).map(i =>
+         `<li><span class="ing-cat-dot" data-cat="${esc(i.cat)}"></span>${esc(i.name)} <span class="ing-amount">${esc(i.qty)}${esc(i.unit)}</span></li>`
+       ).join('')}</ul>` : '';
+  const steps = (r.steps || []).length
+    ? `<div class="rv-section-title">手順</div>
+       <ol class="step-list">${(r.steps || []).map(s => `<li>${esc(s.text)}</li>`).join('')}</ol>` : '';
+  if (!ings && !steps) return `<p class="rv-empty">材料・手順が未登録です</p>`;
+  return ings + steps;
+}
+
+function showRecipeTab(slot, idx) {
+  const viewer = document.getElementById(`meal-recipe-viewer-${slot}`);
+  if (!viewer) return;
+  viewer.querySelectorAll('.rv-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  viewer.querySelectorAll('.rv-panel').forEach((p, i) => p.classList.toggle('hidden', i !== idx));
+}
+
+// レシピタグ＋ビューアを一括更新
+function refreshMealSlotUI(slot) {
+  const el = document.getElementById(`meal-names-${slot}`);
+  if (!el) return;
+  const arr = JSON.parse(el.dataset.values || '[]');
+  el.innerHTML = renderSlotRecipeTags(slot, arr) +
+    `<button class="add-recipe-btn" onclick="openRecipePicker('${slot}')">＋ レシピを追加</button>`;
+  const viewer = document.getElementById(`meal-recipe-viewer-${slot}`);
+  if (viewer) viewer.innerHTML = renderRecipeViewer(slot, arr);
+  const preview = document.getElementById(`meal-preview-${slot}`);
+  if (preview) preview.textContent = arr.length ? arr.join('・') : '';
 }
 
 function openSheet(key, month, day) {
@@ -1353,8 +1417,7 @@ function selectRecipeForSlot(name) {
     if (!arr.includes(name)) {
       arr.push(name);
       el.dataset.values = JSON.stringify(arr);
-      el.innerHTML = renderSlotRecipeTags(pickerSlot, arr) +
-        `<button class="add-recipe-btn" onclick="openRecipePicker('${pickerSlot}')">＋ レシピを追加</button>`;
+      refreshMealSlotUI(pickerSlot);
     }
   }
   closeRecipePicker();
