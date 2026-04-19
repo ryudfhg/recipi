@@ -704,16 +704,65 @@ function switchRpTab(idx) {
 }
 
 function recipeViewHTML(r) {
-  const ings = (r.ingredients || []).length
-    ? `<div class="rv-section-title">材料（${r.servings || 2}人分）</div>
-       <ul class="ing-list">${(r.ingredients || []).map(i =>
-         `<li><span class="ing-cat-dot" data-cat="${esc(i.cat)}"></span>${esc(i.name)} <span class="ing-amount">${esc(i.qty)}${esc(i.unit)}</span></li>`
-       ).join('')}</ul>` : '';
-  const steps = (r.steps || []).length
-    ? `<div class="rv-section-title">手順</div>
-       <ol class="step-list">${(r.steps || []).map(s => `<li>${esc(s.text)}</li>`).join('')}</ol>` : '';
-  if (!ings && !steps) return `<p class="rv-empty">材料・手順が未登録です</p>`;
-  return ings + steps;
+  // メタ情報チップ
+  const chips = [];
+  if (r.servings)    chips.push(`<span class="rp-meta-chip">🍽 ${r.servings}人分</span>`);
+  if (r.cookTime)    chips.push(`<span class="rp-meta-chip">⏱ ${parseInt(r.cookTime) < 60 ? parseInt(r.cookTime)+'分' : Math.floor(parseInt(r.cookTime)/60)+'時間'+(parseInt(r.cookTime)%60 ? parseInt(r.cookTime)%60+'分' : '')}</span>`);
+  if (r.storageTime) chips.push(`<span class="rp-meta-chip">📦 ${esc(r.storageTime)}</span>`);
+
+  const banner = `
+    <div class="rp-banner">
+      <div class="rp-recipe-name">${esc(r.name)}</div>
+      ${chips.length ? `<div class="rp-meta-chips">${chips.join('')}</div>` : ''}
+    </div>`;
+
+  // 材料
+  let ingsHTML = '';
+  if ((r.ingredients || []).length) {
+    // カテゴリでグループ化
+    const groups = {};
+    (r.ingredients || []).forEach(i => {
+      const cat = i.cat || 'その他';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(i);
+    });
+    const rows = Object.entries(groups).map(([cat, items]) =>
+      items.map(i => `
+        <div class="rp-ing-row">
+          <span class="ing-cat-dot" data-cat="${esc(cat)}"></span>
+          <span class="rp-ing-name">${esc(i.name)}</span>
+          <span class="rp-ing-qty">${esc(i.qty)}${esc(i.unit)}</span>
+        </div>`).join('')
+    ).join('');
+    ingsHTML = `
+      <div class="rp-section">
+        <div class="rp-section-label">
+          <span class="rp-section-icon">🥬</span>材料
+          <span class="rp-section-sub">（${r.servings || 2}人分）</span>
+        </div>
+        <div class="rp-ing-grid">${rows}</div>
+      </div>`;
+  }
+
+  // 手順
+  let stepsHTML = '';
+  if ((r.steps || []).length) {
+    const stepItems = (r.steps || []).map((s, i) => `
+      <div class="rp-step">
+        <div class="rp-step-num">${i + 1}</div>
+        <div class="rp-step-text">${esc(s.text)}</div>
+      </div>`).join('');
+    stepsHTML = `
+      <div class="rp-section">
+        <div class="rp-section-label"><span class="rp-section-icon">📋</span>手順</div>
+        <div class="rp-steps">${stepItems}</div>
+      </div>`;
+  }
+
+  if (!ingsHTML && !stepsHTML) {
+    return banner + `<div class="rp-empty-body"><p class="rp-empty-msg">材料・手順が未登録です</p></div>`;
+  }
+  return banner + ingsHTML + stepsHTML;
 }
 
 // レシピタグとヘッダープレビューを一括更新
