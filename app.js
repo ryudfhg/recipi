@@ -95,7 +95,11 @@ function applyData(data) {
   stocks    = data.stocks    || [];
   shopItems = data.shopItems || [];
   recipes   = data.recipes   || [];
-  lastSyncJSON = JSON.stringify({ meals, stocks, shopItems, recipes });
+  if (data.ingCategories) localStorage.setItem('ingCategories', JSON.stringify(data.ingCategories));
+  if (data.stockCats)     localStorage.setItem('stockCats',     JSON.stringify(data.stockCats));
+  if (data.recipeCats)    localStorage.setItem('recipeCats',    JSON.stringify(data.recipeCats));
+  lastSyncJSON = JSON.stringify({ meals, stocks, shopItems, recipes,
+    ingCategories: getCategories(), stockCats: getStockCategories(), recipeCats: getRecipeCategories() });
   saveLocal();
 }
 
@@ -159,10 +163,13 @@ async function pollSync() {
     const data = await res.json();
     if (!data || typeof data !== 'object') return;
     const newJSON = JSON.stringify({
-      meals:     data.meals     || {},
-      stocks:    data.stocks    || [],
-      shopItems: data.shopItems || [],
-      recipes:   data.recipes   || [],
+      meals:         data.meals         || {},
+      stocks:        data.stocks        || [],
+      shopItems:     data.shopItems     || [],
+      recipes:       data.recipes       || [],
+      ingCategories: data.ingCategories || [],
+      stockCats:     data.stockCats     || [],
+      recipeCats:    data.recipeCats    || [],
     });
     if (newJSON === lastSyncJSON) return; // 変化なし
     applyData(data);
@@ -192,7 +199,8 @@ async function pushData() {
     res = await fetch(`${fbUrl}/${key}.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ meals, stocks, shopItems, recipes })
+      body: JSON.stringify({ meals, stocks, shopItems, recipes,
+        ingCategories: getCategories(), stockCats: getStockCategories(), recipeCats: getRecipeCategories() })
     });
   } catch(e) {
     saveLocal();
@@ -213,7 +221,8 @@ async function pushData() {
     return;
   }
   // 自分の保存内容をキャッシュ（ポーリングで自己更新を誤検知しないよう）
-  lastSyncJSON = JSON.stringify({ meals, stocks, shopItems, recipes });
+  lastSyncJSON = JSON.stringify({ meals, stocks, shopItems, recipes,
+    ingCategories: getCategories(), stockCats: getStockCategories(), recipeCats: getRecipeCategories() });
   showSync('保存しました ✓');
   setTimeout(hideSync, 1500);
 }
@@ -240,7 +249,8 @@ async function setupBlob() {
 
 // ======== ローカルストレージ（file://用） ========
 function saveLocal() {
-  localStorage.setItem('app_data', JSON.stringify({ meals, stocks, shopItems, recipes }));
+  localStorage.setItem('app_data', JSON.stringify({ meals, stocks, shopItems, recipes,
+    ingCategories: getCategories(), stockCats: getStockCategories(), recipeCats: getRecipeCategories() }));
 }
 function loadLocal() {
   loadLocalSilent();
@@ -252,6 +262,9 @@ function loadLocalSilent() {
   stocks    = data.stocks    || [];
   shopItems = data.shopItems || [];
   recipes   = data.recipes   || [];
+  if (data.ingCategories) localStorage.setItem('ingCategories', JSON.stringify(data.ingCategories));
+  if (data.stockCats)     localStorage.setItem('stockCats',     JSON.stringify(data.stockCats));
+  if (data.recipeCats)    localStorage.setItem('recipeCats',    JSON.stringify(data.recipeCats));
   renderAll();
 }
 
@@ -333,6 +346,7 @@ function addCategory() {
   populateShopCatSelect();
   populateIngCatSelect();
   showToast(`「${name}」を追加しました`);
+  pushData();
 }
 
 function removeCategory(name) {
@@ -342,6 +356,7 @@ function removeCategory(name) {
   renderCatSettings();
   populateShopCatSelect();
   populateIngCatSelect();
+  pushData();
 }
 
 function renderCatSettings() {
@@ -878,6 +893,7 @@ function addStockCategory() {
   renderStockCatFilters();
   populateStockCatSelect();
   showToast(`「${name}」を追加しました`);
+  pushData();
 }
 
 function removeStockCategory(name) {
@@ -887,6 +903,7 @@ function removeStockCategory(name) {
   renderStockCatSettings();
   renderStockCatFilters();
   populateStockCatSelect();
+  pushData();
 }
 
 function renderStockCatSettings() {
@@ -1209,6 +1226,7 @@ function addRecipeCategory() {
   populateRecipeCatBtns();
   renderPickerCatTabs('all');
   showToast(`「${name}」を追加しました`);
+  pushData();
 }
 
 function removeRecipeCategory(name) {
@@ -1218,6 +1236,7 @@ function removeRecipeCategory(name) {
   renderRecipeCatSettings();
   populateRecipeCatBtns();
   renderPickerCatTabs('all');
+  pushData();
 }
 
 function renderRecipeCatSettings() {
@@ -1335,8 +1354,8 @@ function openRecipeSheet(editId = null) {
   document.getElementById('recipe-edit-id').value = r ? r.id : '';
   document.getElementById('recipe-sheet-title').textContent = r ? 'レシピを編集' : 'レシピを追加';
 
-  tempIngredients = r ? r.ingredients.map(i => ({ ...i })) : [];
-  tempSteps       = r ? r.steps.map(s => ({ ...s }))       : [];
+  tempIngredients = r ? (r.ingredients || []).map(i => ({ ...i })) : [];
+  tempSteps       = r ? (r.steps || []).map(s => ({ ...s }))       : [];
 
   document.getElementById('r-name').value      = r ? r.name        : '';
   document.getElementById('r-servings').value  = r ? r.servings    : '2';
