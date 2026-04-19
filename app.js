@@ -1330,18 +1330,25 @@ function selectRecipeForSlot(name) {
 let tempIngredients = [];
 let tempSteps       = [];
 
-function openRecipeSheet() {
-  tempIngredients = [];
-  tempSteps       = [];
-  ['r-name','r-cook-time','r-storage','step-text','ing-name','ing-qty'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
-  document.getElementById('r-servings').value = '2';
+function openRecipeSheet(editId = null) {
+  const r = editId != null ? recipes.find(r => r.id === editId) : null;
+  document.getElementById('recipe-edit-id').value = r ? r.id : '';
+  document.getElementById('recipe-sheet-title').textContent = r ? 'レシピを編集' : 'レシピを追加';
+
+  tempIngredients = r ? r.ingredients.map(i => ({ ...i })) : [];
+  tempSteps       = r ? r.steps.map(s => ({ ...s }))       : [];
+
+  document.getElementById('r-name').value      = r ? r.name        : '';
+  document.getElementById('r-servings').value  = r ? r.servings    : '2';
+  document.getElementById('r-cook-time').value = r ? (r.cookTime || '') : '';
+  document.getElementById('r-storage').value   = r ? (r.storageTime || '') : '';
+  ['step-text','ing-name','ing-qty'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('ing-unit').value = 'g';
+
   renderTempIngredients();
   renderTempSteps();
   populateIngCatSelect();
-  populateRecipeCatBtns();
+  populateRecipeCatBtns(r ? r.category : undefined);
   document.getElementById('recipe-sheet-overlay').classList.remove('hidden');
   document.getElementById('recipe-sheet').classList.remove('hidden');
 }
@@ -1420,21 +1427,44 @@ function renderTempSteps() {
 async function saveRecipe() {
   const name = document.getElementById('r-name').value.trim();
   if (!name) { showToast('レシピ名を入力してください', 'error'); return; }
-  recipes.push({
-    id:          Date.now(),
-    name,
-    category:    document.getElementById('r-category').value,
-    servings:    parseInt(document.getElementById('r-servings').value) || 2,
-    cookTime:    document.getElementById('r-cook-time').value.trim(),
-    storageTime: document.getElementById('r-storage').value.trim(),
-    ingredients: [...tempIngredients],
-    steps:       [...tempSteps],
-    open:        false
-  });
-  closeRecipeSheet();
-  renderRecipes();
-  await pushData();
-  showToast(`「${name}」を追加しました`);
+  const editIdRaw = document.getElementById('recipe-edit-id').value;
+  const editId    = editIdRaw ? Number(editIdRaw) : null;
+
+  if (editId) {
+    const idx = recipes.findIndex(r => r.id === editId);
+    if (idx >= 0) {
+      recipes[idx] = {
+        ...recipes[idx],
+        name,
+        category:    document.getElementById('r-category').value,
+        servings:    parseInt(document.getElementById('r-servings').value) || 2,
+        cookTime:    document.getElementById('r-cook-time').value.trim(),
+        storageTime: document.getElementById('r-storage').value.trim(),
+        ingredients: [...tempIngredients],
+        steps:       [...tempSteps],
+      };
+    }
+    closeRecipeSheet();
+    renderRecipes();
+    await pushData();
+    showToast(`「${name}」を更新しました`);
+  } else {
+    recipes.push({
+      id:          Date.now(),
+      name,
+      category:    document.getElementById('r-category').value,
+      servings:    parseInt(document.getElementById('r-servings').value) || 2,
+      cookTime:    document.getElementById('r-cook-time').value.trim(),
+      storageTime: document.getElementById('r-storage').value.trim(),
+      ingredients: [...tempIngredients],
+      steps:       [...tempSteps],
+      open:        false
+    });
+    closeRecipeSheet();
+    renderRecipes();
+    await pushData();
+    showToast(`「${name}」を追加しました`);
+  }
 }
 
 async function deleteRecipe(id) {
@@ -1500,6 +1530,7 @@ function recipeCardHTML(r) {
     const ICON_CLOCK = `<svg style="width:12px;height:12px;vertical-align:middle;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>`;
     const ICON_BOX   = `<svg style="width:12px;height:12px;vertical-align:middle;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`;
     const ICON_TRASH = `<svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+    const ICON_EDIT  = `<svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
     const ICON_SHOP  = `<svg style="width:15px;height:15px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`;
     const ICON_UP    = `<svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>`;
     const ICON_DOWN  = `<svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
@@ -1524,6 +1555,7 @@ function recipeCardHTML(r) {
           ${infos.length ? `<div class="recipe-infos">${infos.map(t => `<span class="recipe-info-chip">${t}</span>`).join('')}</div>` : ''}
         </div>
         <div class="recipe-header-right">
+          <button class="del-btn" onclick="event.stopPropagation();openRecipeSheet(${r.id})">${ICON_EDIT}</button>
           <button class="del-btn" onclick="event.stopPropagation();deleteRecipe(${r.id})">${ICON_TRASH}</button>
           <span class="recipe-arrow">${r.open ? ICON_UP : ICON_DOWN}</span>
         </div>

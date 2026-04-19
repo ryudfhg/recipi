@@ -410,11 +410,15 @@ select.field {
 .icon-action-btn {
   background: none;
   border: none;
-  font-size: .95rem;
   cursor: pointer;
   padding: 4px 3px;
   line-height: 1;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
 }
+.icon-action-btn svg { width: 18px; height: 18px; }
+.icon-action-btn:active { color: var(--green); }
 
 .badge { font-size: .65rem; font-weight: 700; padding: 2px 6px; border-radius: 8px; white-space: nowrap; }
 .badge-ok       { background: var(--green-lt); color: var(--green-dk); }
@@ -423,8 +427,10 @@ select.field {
 
 .del-btn {
   background: none; border: none;
-  font-size: 1.05rem; cursor: pointer; color: #ccc; padding: 4px 3px; line-height: 1;
+  cursor: pointer; color: #ccc; padding: 4px 3px; line-height: 1;
+  display: flex; align-items: center;
 }
+.del-btn svg { width: 17px; height: 17px; }
 .del-btn:active { color: var(--red); }
 
 /* 買い物カテゴリ */
