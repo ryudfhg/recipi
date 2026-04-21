@@ -45,9 +45,9 @@
         <div id="cat-filters" class="filter-row"></div>
         <div class="filter-section-label">状態</div>
         <div id="status-filters" class="filter-row">
-          <button class="chip active" onclick="filterStockStatus('all',this)">すべて</button>
-          <button class="chip" onclick="filterStockStatus('low',this)">残り少ない</button>
-          <button class="chip" onclick="filterStockStatus('expiring',this)">期限間近</button>
+          <button class="chip active" onclick="filterStockStatus('all')">すべて</button>
+          <button class="chip" onclick="filterStockStatus('low')">残り少ない</button>
+          <button class="chip" onclick="filterStockStatus('expiring')">期限間近</button>
         </div>
       </div>
       <div id="stock-list" class="item-list"></div>
@@ -427,7 +427,7 @@
     <div class="meal-editor" id="meal-editor-blocks"></div>
 
     <div id="add-result-panel" class="add-result-panel hidden"></div>
-    <button class="ghost-btn full" onclick="addMealDayToShopList()">🛒 全スロット一括追加</button>
+    <button class="ghost-btn full" onclick="openBuySheet('all')">🛒 全スロット一括追加</button>
     <button class="primary-btn full" onclick="saveMeal()">保存する</button>
   </div>
 
@@ -447,6 +447,15 @@
       <button class="primary-btn full" onclick="setupBlob()" id="setup-btn" style="margin-top:12px">データを作成</button>
       <p class="setup-note" id="setup-status"></p>
     </div>
+  </div>
+
+  <!-- ===== 買い物追加シート ===== -->
+  <div id="buy-sheet-overlay" class="sheet-bg hidden" onclick="closeBuySheet()"></div>
+  <div id="buy-sheet" class="bottom-sheet hidden">
+    <div class="sheet-handle"></div>
+    <h3>買い物リストに追加</h3>
+    <div id="buy-recipe-list"></div>
+    <button class="primary-btn full" style="margin-top:12px" onclick="executeBuyFromSheet()">追加する</button>
   </div>
 
   <!-- ===== 買い物アクションシート ===== -->

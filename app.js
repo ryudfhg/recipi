@@ -570,16 +570,14 @@ function cellHTML(date, otherMonth) {
     if (!m.names.length && m.p1 && m.p2) return;
     const b1 = !m.p1 ? `<span class="att-badge att-off">${p1Initial}</span>` : '';
     const b2 = !m.p2 ? `<span class="att-badge att-off">${p2Initial}</span>` : '';
-    const nameDisp = m.names.length
-      ? m.names[0] + (m.names.length > 1 ? ` +${m.names.length - 1}` : '')
-      : '';
+    const namesDisp = m.names.map(n => `<div class="preview-name">${esc(n)}</div>`).join('');
     preview += `<div class="cal-meal-preview">
       <div class="preview-header">
         <span class="preview-icon">${SVG[slot]}</span>
         <span class="preview-label">${slotLabels[slot]}</span>
         ${b1}${b2}
       </div>
-      ${nameDisp ? `<div class="preview-name">${esc(nameDisp)}</div>` : ''}
+      ${namesDisp}
     </div>`;
   });
 
@@ -626,7 +624,6 @@ function buildMealEditorBlocks(key, names) {
   ];
   const container = document.getElementById('meal-editor-blocks');
   container.dataset.editKey = key;
-  const defaultServ = getDefaultServings();
   container.innerHTML = slotDefs.map(({ slot, icon, label }) => {
     const m = getMealSlot(key, slot);
     const namesJson = esc(JSON.stringify(m.names));
@@ -646,11 +643,7 @@ function buildMealEditorBlocks(key, names) {
         </div>
 
         <div class="servings-row-slot">
-          <label class="servings-slot-label">🛒</label>
-          <input type="number" id="servings-${slot}" min="1" inputmode="numeric"
-            class="field servings-slot-input" value="${defaultServ}">
-          <span class="servings-slot-unit">人分</span>
-          <button class="servings-slot-add-btn" onclick="addSlotToShopList('${slot}')">買い物リストに追加</button>
+          <button class="servings-slot-add-btn" onclick="openBuySheet('${slot}')">🛒 買い物リストに追加</button>
         </div>
         <div class="attend-row">
           <button class="attend-btn ${m.p1 ? 'on' : 'off'}" id="attend-${slot}-p1" onclick="toggleAttend('${slot}','p1')">
@@ -881,19 +874,39 @@ function applyNeededToShopList(neededMap) {
     const inStock = stocks
       .filter(s => s.name === item.name && (s.unit || '') === item.unit)
       .reduce((sum, s) => sum + (toNum(String(s.qty)) || 0), 0);
-    const required = item.qty - inStock;
-    if (required <= 0) { skipped++; return; }
-    const qtyStr = fmtQty(required);
     const existing = shopItems.find(i => i.name === item.name && i.unit === item.unit && !i.checked);
     if (existing) {
-      const prev = toNum(existing.qty) || 0;
-      existing.qty = fmtQty(prev + required);
+      // totalNeeded がない場合は現在のqty+在庫から推計
+      const prevTotal = existing.totalNeeded ?? (toNum(existing.qty) || 0) + inStock;
+      existing.totalNeeded = prevTotal + item.qty;
+      const newRequired = Math.max(0, existing.totalNeeded - inStock);
+      existing.qty = fmtQty(newRequired);
+      if (newRequired > 0) addedItems.push({ name: item.name, qty: fmtQty(newRequired), unit: item.unit });
     } else {
-      shopItems.push({ id: Date.now() + Math.random(), name: item.name, qty: qtyStr, unit: item.unit, cat: item.cat, checked: false });
+      const required = item.qty - inStock;
+      if (required <= 0) { skipped++; return; }
+      const qtyStr = fmtQty(required);
+      shopItems.push({ id: Date.now() + Math.random(), name: item.name, qty: qtyStr, unit: item.unit, cat: item.cat, checked: false, totalNeeded: item.qty });
+      addedItems.push({ name: item.name, qty: qtyStr, unit: item.unit });
     }
-    addedItems.push({ name: item.name, qty: qtyStr, unit: item.unit });
   });
   return { addedItems, skipped };
+}
+
+function recalcShopItemsFromStock() {
+  let changed = false;
+  shopItems = shopItems.filter(item => {
+    if (item.totalNeeded == null || item.checked) return true;
+    const inStock = stocks
+      .filter(s => s.name === item.name && (s.unit || '') === (item.unit || ''))
+      .reduce((sum, s) => sum + (toNum(String(s.qty)) || 0), 0);
+    const newQtyNum = Math.max(0, item.totalNeeded - inStock);
+    if (newQtyNum <= 0) { changed = true; return false; }
+    const newQtyStr = fmtQty(newQtyNum);
+    if (newQtyStr !== item.qty) { item.qty = newQtyStr; changed = true; }
+    return true;
+  });
+  return changed;
 }
 
 function showAddResultPanel(rows) {
@@ -954,6 +967,69 @@ async function addMealDayToShopList() {
   const allServings = [...new Set(slotData.map(s => s.servings))];
   const servLabel = allServings.length === 1 ? allServings[0] : slotData.map(s => s.servings).join('/');
   showAddResultPanel([{ label: '全スロット', servings: servLabel, addedItems, skipped }]);
+}
+
+// ======== 買い物追加シート ========
+let buySheetItems = [];
+
+function openBuySheet(slot) {
+  const slots = slot === 'all' ? ['morning', 'noon', 'night'] : [slot];
+  const slotLabels = { morning: '朝食', noon: '昼食', night: '夕食' };
+  const defaultServ = getDefaultServings();
+
+  buySheetItems = [];
+  slots.forEach(s => {
+    getMealSlotNames(s).forEach(name => buySheetItems.push({ slot: s, name }));
+  });
+
+  if (!buySheetItems.length) { showToast('レシピが選択されていません', 'error'); return; }
+
+  document.getElementById('buy-recipe-list').innerHTML = buySheetItems.map((item, i) => `
+    <div class="buy-recipe-row">
+      <div class="buy-recipe-info">
+        <span class="buy-slot-label">${slotLabels[item.slot]}</span>
+        <span class="buy-recipe-name">${esc(item.name)}</span>
+      </div>
+      <div class="buy-servings-wrap">
+        <input type="number" class="field buy-serv-input" id="buy-serv-${i}"
+          value="${defaultServ}" min="1" inputmode="numeric">
+        <span class="buy-serv-unit">人分</span>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('buy-sheet-overlay').classList.remove('hidden');
+  document.getElementById('buy-sheet').classList.remove('hidden');
+}
+
+function closeBuySheet() {
+  document.getElementById('buy-sheet-overlay').classList.add('hidden');
+  document.getElementById('buy-sheet').classList.add('hidden');
+}
+
+async function executeBuyFromSheet() {
+  const needed = {};
+  buySheetItems.forEach((item, i) => {
+    const servings = parseInt(document.getElementById(`buy-serv-${i}`)?.value) || getDefaultServings();
+    const recipe = recipes.find(r => r.name === item.name);
+    if (!recipe || !(recipe.ingredients || []).length) return;
+    const ratio = servings / (recipe.servings || 2);
+    recipe.ingredients.forEach(ing => {
+      const rawQty = toNum(ing.qty);
+      const scaled = isNaN(rawQty) || rawQty === 0 ? 0 : rawQty * ratio;
+      const key = `${ing.name}__${ing.unit || ''}`;
+      if (needed[key]) needed[key].qty += scaled;
+      else needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled };
+    });
+  });
+
+  if (!Object.keys(needed).length) { showToast('材料が登録されたレシピがありません', 'error'); return; }
+
+  const { addedItems } = applyNeededToShopList(needed);
+  renderShopItems();
+  await pushData();
+  closeBuySheet();
+  showToast(`${addedItems.length}件を買い物リストに追加しました`);
 }
 
 async function addSlotToShopList(slot) {
@@ -1017,13 +1093,14 @@ async function saveMeal() {
 
 // ======== 在庫 ========
 const DEFAULT_STOCK_CATS = ['食材', '調味料', '冷凍ストック'];
-let stockCatFilter    = 'all';
-let recipeCatFilter   = 'all';
+const stockCatFilters    = new Set();
+const recipeCatFilters   = new Set();
 
-function filterRecipeCat(f, btn) {
-  recipeCatFilter = f;
-  document.querySelectorAll('#recipe-cat-filters .chip').forEach(c => c.classList.remove('active'));
-  btn.classList.add('active');
+function filterRecipeCat(f) {
+  if (f === 'all') { recipeCatFilters.clear(); }
+  else if (recipeCatFilters.has(f)) { recipeCatFilters.delete(f); }
+  else { recipeCatFilters.add(f); }
+  renderRecipeCatFilters();
   renderRecipes();
 }
 
@@ -1032,12 +1109,12 @@ function renderRecipeCatFilters() {
   if (!container) return;
   const cats = getRecipeCategories();
   container.innerHTML =
-    `<button class="chip ${recipeCatFilter === 'all' ? 'active' : ''}" onclick="filterRecipeCat('all',this)">すべて</button>`
+    `<button class="chip ${recipeCatFilters.size === 0 ? 'active' : ''}" onclick="filterRecipeCat('all')">すべて</button>`
     + cats.map(c =>
-      `<button class="chip ${recipeCatFilter === c ? 'active' : ''}" onclick="filterRecipeCat('${esc(c)}',this)">${esc(c)}</button>`
+      `<button class="chip ${recipeCatFilters.has(c) ? 'active' : ''}" onclick="filterRecipeCat('${esc(c)}')">${esc(c)}</button>`
     ).join('');
 }
-let stockStatusFilter = 'all';
+const stockStatusFilters = new Set();
 
 function getStockCategories() {
   const s = localStorage.getItem('stockCats');
@@ -1098,8 +1175,8 @@ function renderStockCatFilters() {
   const container = document.getElementById('cat-filters');
   if (!container) return;
   const cats = getStockCategories();
-  container.innerHTML = `<button class="chip ${stockCatFilter === 'all' ? 'active' : ''}" onclick="filterStockCat('all',this)">すべて</button>`
-    + cats.map(c => `<button class="chip ${stockCatFilter === c ? 'active' : ''}" onclick="filterStockCat('${esc(c)}',this)">${esc(c)}</button>`).join('');
+  container.innerHTML = `<button class="chip ${stockCatFilters.size === 0 ? 'active' : ''}" onclick="filterStockCat('all')">すべて</button>`
+    + cats.map(c => `<button class="chip ${stockCatFilters.has(c) ? 'active' : ''}" onclick="filterStockCat('${esc(c)}')">${esc(c)}</button>`).join('');
 }
 
 function openStockSheet(editId = null) {
@@ -1144,6 +1221,7 @@ async function saveStockFromSheet() {
     stocks.push({ id: Date.now(), cat, name, qty, qtyStr, unit, expiry });
   }
   renderStocks();
+  if (recalcShopItemsFromStock()) renderShopItems();
   closeStockSheet();
   await pushData();
   showToast(editId ? '更新しました' : `「${name}」を追加しました`);
@@ -1156,6 +1234,7 @@ async function adjustStockQty(id, delta) {
   s.qty = newQty;
   s.qtyStr = String(newQty);
   renderStocks();
+  if (recalcShopItemsFromStock()) renderShopItems();
   await pushData();
 }
 
@@ -1164,15 +1243,20 @@ async function addStockToShopList(id) {
   if (!s) return;
   if (!confirm(`「${s.name}」を買い物リストに追加しますか？`)) return;
   const cats = getCategories();
-  shopItems.push({
-    id:      Date.now() + Math.random(),
-    name:    s.name,
-    qty:     '1',
-    unit:    s.unit || '',
-    cat:     cats.includes(s.cat) ? s.cat : (cats[0] || 'その他'),
-    checked: false,
-    stockId: s.id
-  });
+  const existing = shopItems.find(i => i.name === s.name && (i.unit || '') === (s.unit || '') && !i.checked);
+  if (existing) {
+    existing.qty = fmtQty((toNum(existing.qty) || 0) + 1);
+  } else {
+    shopItems.push({
+      id:      Date.now() + Math.random(),
+      name:    s.name,
+      qty:     '1',
+      unit:    s.unit || '',
+      cat:     cats.includes(s.cat) ? s.cat : (cats[0] || 'その他'),
+      checked: false,
+      stockId: s.id
+    });
+  }
   renderShopItems();
   await pushData();
   showToast(`「${s.name}」を買い物リストに追加しました`);
@@ -1197,17 +1281,28 @@ function getStatus(s) {
   return 'ok';
 }
 
-function filterStockCat(f, btn) {
-  stockCatFilter = f;
-  document.querySelectorAll('#cat-filters .chip').forEach(c => c.classList.remove('active'));
-  btn.classList.add('active');
+function filterStockCat(f) {
+  if (f === 'all') { stockCatFilters.clear(); }
+  else if (stockCatFilters.has(f)) { stockCatFilters.delete(f); }
+  else { stockCatFilters.add(f); }
+  renderStockCatFilters();
   renderStocks();
 }
 
-function filterStockStatus(f, btn) {
-  stockStatusFilter = f;
+function filterStockStatus(f) {
+  if (f === 'all') { stockStatusFilters.clear(); }
+  else if (stockStatusFilters.has(f)) { stockStatusFilters.delete(f); }
+  else { stockStatusFilters.add(f); }
+  // ステータスフィルターボタンのactive更新
   document.querySelectorAll('#status-filters .chip').forEach(c => c.classList.remove('active'));
-  btn.classList.add('active');
+  if (stockStatusFilters.size === 0) {
+    document.querySelector('#status-filters .chip')?.classList.add('active');
+  } else {
+    document.querySelectorAll('#status-filters .chip').forEach(c => {
+      const val = c.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+      if (val && stockStatusFilters.has(val)) c.classList.add('active');
+    });
+  }
   renderStocks();
 }
 
@@ -1216,17 +1311,16 @@ function renderStocks() {
 
   // カテゴリ・状態フィルター適用
   let filtered = stocks.map(s => ({ ...s, cat: s.cat || '食材' })); // 旧データ互換
-  if (stockCatFilter    !== 'all') filtered = filtered.filter(s => s.cat === stockCatFilter);
-  if (stockStatusFilter === 'low')      filtered = filtered.filter(s => getStatus(s) === 'low');
-  if (stockStatusFilter === 'expiring') filtered = filtered.filter(s => getStatus(s) === 'expiring');
+  if (stockCatFilters.size > 0)    filtered = filtered.filter(s => stockCatFilters.has(s.cat));
+  if (stockStatusFilters.size > 0) filtered = filtered.filter(s => stockStatusFilters.has(getStatus(s)));
 
   if (!filtered.length) {
     list.innerHTML = '<div class="empty-card">在庫がありません</div>';
     return;
   }
 
-  // カテゴリ別にグループ化（すべて表示のときのみ）
-  if (stockCatFilter === 'all') {
+  // カテゴリ別にグループ化
+  if (stockCatFilters.size === 0) {
     const stockCats = getStockCategories();
     const groups = {};
     stockCats.forEach(c => { groups[c] = []; });
@@ -1341,6 +1435,7 @@ async function addCheckedToStock() {
     }
   });
   shopItems = shopItems.filter(i => !i.checked);
+  recalcShopItemsFromStock();
   renderStocks();
   renderShopItems();
   await pushData();
@@ -1355,6 +1450,7 @@ async function moveToStock() {
       stocks.push({ id: Date.now() + Math.random(), name: i.name, qty: parseFloat(i.qty) || 1, unit: i.unit, expiry: '' });
     });
     shopItems = shopItems.filter(i => !i.checked);
+    recalcShopItemsFromStock();
     renderStocks();
     renderShopItems();
     await pushData();
@@ -1798,34 +1894,30 @@ function renderRecipes() {
   }
 
   const cats = getRecipeCategories();
-  const filtered = recipeCatFilter === 'all'
+  const filtered = recipeCatFilters.size === 0
     ? recipes
-    : recipes.filter(r => (r.category || 'その他') === recipeCatFilter);
+    : recipes.filter(r => recipeCatFilters.has(r.category || 'その他'));
 
   if (!filtered.length) {
     list.innerHTML = '<div class="empty-card">該当するレシピがありません</div>';
     return;
   }
 
-  if (recipeCatFilter === 'all') {
-    // カテゴリごとにグループ化
-    const groups = {};
-    cats.forEach(c => { groups[c] = []; });
-    filtered.forEach(r => {
-      const c = r.category || 'その他';
-      if (groups[c]) groups[c].push(r);
-      else { groups[c] = [r]; }
-    });
-    list.innerHTML = cats.map(cat => {
-      if (!groups[cat] || !groups[cat].length) return '';
-      return `<div class="recipe-group">
-        <div class="recipe-group-label">${esc(cat)}</div>
-        ${groups[cat].map(r => recipeCardHTML(r)).join('')}
-      </div>`;
-    }).join('');
-  } else {
-    list.innerHTML = filtered.map(r => recipeCardHTML(r)).join('');
-  }
+  // カテゴリごとにグループ化
+  const groups = {};
+  cats.forEach(c => { groups[c] = []; });
+  filtered.forEach(r => {
+    const c = r.category || 'その他';
+    if (groups[c]) groups[c].push(r);
+    else { groups[c] = [r]; }
+  });
+  list.innerHTML = cats.map(cat => {
+    if (!groups[cat] || !groups[cat].length) return '';
+    return `<div class="recipe-group">
+      <div class="recipe-group-label">${esc(cat)}</div>
+      ${groups[cat].map(r => recipeCardHTML(r)).join('')}
+    </div>`;
+  }).join('');
 }
 
 // ======== 設定タブ ========
@@ -1914,6 +2006,22 @@ function showToast(msg, type = '') {
   t.textContent = msg;
   document.body.appendChild(t);
   toastTimer = setTimeout(() => t.remove(), 2500);
+}
+
+// ======== カレンダースワイプ ========
+{
+  let swipeStartX = null;
+  const calEl = document.getElementById('tab-menu');
+  calEl.addEventListener('touchstart', e => {
+    swipeStartX = e.touches[0].clientX;
+  }, { passive: true });
+  calEl.addEventListener('touchend', e => {
+    if (swipeStartX === null) return;
+    const dx = e.changedTouches[0].clientX - swipeStartX;
+    swipeStartX = null;
+    if (Math.abs(dx) < 60) return;
+    changeMonth(dx < 0 ? 1 : -1);
+  }, { passive: true });
 }
 
 // ======== 初期化 ========
