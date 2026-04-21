@@ -568,14 +568,20 @@ function cellHTML(date, otherMonth) {
     const m = getMealSlot(key, slot);
     // レシピなし かつ 両者とも「要る」なら表示不要
     if (!m.names.length && m.p1 && m.p2) return;
-    const b1 = !m.p1 ? `<span class="att-badge att-off">${p1Initial}</span>` : '';
-    const b2 = !m.p2 ? `<span class="att-badge att-off">${p2Initial}</span>` : '';
+    const bothOff = !m.p1 && !m.p2;
+    let badges = '';
+    if (bothOff) {
+      badges = `<span class="att-badge att-off att-both">${p1Initial}${p2Initial}</span>`;
+    } else {
+      if (!m.p1) badges += `<span class="att-badge att-off">${p1Initial}</span>`;
+      if (!m.p2) badges += `<span class="att-badge att-off">${p2Initial}</span>`;
+    }
     const namesDisp = m.names.map(n => `<div class="preview-name">${esc(n)}</div>`).join('');
     preview += `<div class="cal-meal-preview">
       <div class="preview-header">
         <span class="preview-icon">${SVG[slot]}</span>
         <span class="preview-label">${slotLabels[slot]}</span>
-        ${b1}${b2}
+        ${badges}
       </div>
       ${namesDisp}
     </div>`;

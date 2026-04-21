@@ -227,6 +227,13 @@ body {
 .att-p1  { background: var(--green);  color: white; }
 .att-p2  { background: var(--orange); color: white; }
 .att-off { background: #bdbdbd; color: white; }
+.att-badge.att-both { width: auto; padding: 0 2px; border-radius: 3px; letter-spacing: -.5px; }
+
+.preview-name + .preview-name {
+  border-top: 1px solid rgba(0,0,0,.1);
+  margin-top: 1px;
+  padding-top: 1px;
+}
 
 /* ======== カード ======== */
 .card {
