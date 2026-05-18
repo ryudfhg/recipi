@@ -30,6 +30,7 @@
         <button class="icon-btn" onclick="changeMonth(-1)">&#8249;</button>
         <span id="cal-title"></span>
         <button class="icon-btn" onclick="changeMonth(1)">&#8250;</button>
+        <button class="icon-btn cal-multi-buy-btn" onclick="openMultiDayBuySheet()" title="複数日まとめて買い物リストに追加">🛒</button>
       </div>
       <div class="cal-weekdays">
         <span>日</span><span>月</span><span>火</span><span>水</span>
@@ -439,6 +440,27 @@
       <button class="primary-btn full" onclick="setupBlob()" id="setup-btn" style="margin-top:12px">データを作成</button>
       <p class="setup-note" id="setup-status"></p>
     </div>
+  </div>
+
+  <!-- ===== 複数日一括買い物追加シート ===== -->
+  <div id="multi-buy-overlay" class="sheet-bg hidden" onclick="closeMultiDayBuySheet()"></div>
+  <div id="multi-buy-sheet" class="bottom-sheet hidden">
+    <div class="sheet-handle"></div>
+    <h3>複数日まとめて買い物リストに追加</h3>
+    <div class="multi-buy-range">
+      <div class="multi-buy-range-row">
+        <label class="field-label">開始日</label>
+        <input type="date" class="field multi-buy-date-input" id="multi-buy-from" onchange="renderMultiDayPreview()">
+      </div>
+      <span class="multi-buy-range-sep">〜</span>
+      <div class="multi-buy-range-row">
+        <label class="field-label">終了日</label>
+        <input type="date" class="field multi-buy-date-input" id="multi-buy-to" onchange="renderMultiDayPreview()">
+      </div>
+    </div>
+    <div id="multi-buy-preview" class="multi-buy-preview"></div>
+    <p class="multi-buy-note">※ 指定期間の全レシピ食材を合算し、在庫分を1回だけ差し引いて追加します</p>
+    <button class="primary-btn full" style="margin-top:8px" onclick="executeMultiDayBuy()">買い物リストに追加</button>
   </div>
 
   <!-- ===== 買い物追加シート ===== -->

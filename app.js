@@ -1042,6 +1042,111 @@ async function addMealDayToShopList() {
   showAddResultPanel([{ label: '全スロット', servings: null, addedItems, skipped }]);
 }
 
+// ======== 複数日一括買い物追加 ========
+function getDaysInRange(fromStr, toStr) {
+  const result = [];
+  const from = new Date(fromStr + 'T00:00:00');
+  const to   = new Date(toStr   + 'T00:00:00');
+  if (isNaN(from) || isNaN(to) || from > to) return result;
+  const cur = new Date(from);
+  while (cur <= to) {
+    result.push(dateKey(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return result;
+}
+
+function openMultiDayBuySheet() {
+  const today = new Date();
+  const end   = new Date(today);
+  end.setDate(end.getDate() + 6);
+  document.getElementById('multi-buy-from').value = dateKey(today);
+  document.getElementById('multi-buy-to').value   = dateKey(end);
+  renderMultiDayPreview();
+  document.getElementById('multi-buy-overlay').classList.remove('hidden');
+  document.getElementById('multi-buy-sheet').classList.remove('hidden');
+}
+
+function closeMultiDayBuySheet() {
+  document.getElementById('multi-buy-overlay').classList.add('hidden');
+  document.getElementById('multi-buy-sheet').classList.add('hidden');
+}
+
+function renderMultiDayPreview() {
+  const from = document.getElementById('multi-buy-from').value;
+  const to   = document.getElementById('multi-buy-to').value;
+  const el   = document.getElementById('multi-buy-preview');
+  if (!el) return;
+  if (!from || !to) { el.innerHTML = '<p class="multi-buy-empty">日付を選択してください</p>'; return; }
+  const slotLabels = { morning: '朝', noon: '昼', night: '夕' };
+  const days = getDaysInRange(from, to);
+  const daysWithMeals = days.filter(d =>
+    ['morning','noon','night'].some(slot => getMealSlot(d, slot).names.length > 0)
+  );
+  if (!daysWithMeals.length) {
+    el.innerHTML = '<p class="multi-buy-empty">この期間に献立がありません</p>';
+    return;
+  }
+  el.innerHTML = daysWithMeals.map(d => {
+    const [, m, dy] = d.split('-');
+    const label = `${parseInt(m)}/${parseInt(dy)}`;
+    const slots = ['morning','noon','night'].map(slot => {
+      const ms = getMealSlot(d, slot);
+      if (!ms.names.length) return '';
+      return `<span class="multi-buy-slot">${slotLabels[slot]}:${ms.names.join('・')}</span>`;
+    }).filter(Boolean).join('');
+    return `<div class="multi-buy-day-row">
+      <span class="multi-buy-date-lbl">${label}</span>
+      <span class="multi-buy-slots">${slots}</span>
+    </div>`;
+  }).join('');
+}
+
+async function executeMultiDayBuy() {
+  const from = document.getElementById('multi-buy-from').value;
+  const to   = document.getElementById('multi-buy-to').value;
+  if (!from || !to) { showToast('日付を選択してください', 'error'); return; }
+
+  const days = getDaysInRange(from, to);
+  const needed = {};
+
+  days.forEach(dk => {
+    ['morning','noon','night'].forEach(slot => {
+      const m = getMealSlot(dk, slot);
+      if (!m.names.length) return;
+      m.names.forEach((name, idx) => {
+        const recipe = recipes.find(r => r.name === name);
+        if (!recipe || !(recipe.ingredients || []).length) return;
+        const servings = (m.servingsArr && m.servingsArr[idx] != null) ? m.servingsArr[idx] : getDefaultServings();
+        const ratio = servings / (recipe.servings || 2);
+        recipe.ingredients.forEach(ing => {
+          const rawQty = toNum(ing.qty);
+          const scaled = isNaN(rawQty) || rawQty === 0 ? 0 : rawQty * ratio;
+          const key = `${ing.name}__${ing.unit || ''}`;
+          if (needed[key]) needed[key].qty += scaled;
+          else needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled };
+        });
+      });
+    });
+  });
+
+  if (!Object.keys(needed).length) { showToast('期間内に材料が登録されたレシピがありません', 'error'); return; }
+
+  const { addedItems, skipped } = applyNeededToShopList(needed);
+  renderShopItems();
+  await pushData();
+  closeMultiDayBuySheet();
+
+  const msgs = [];
+  if (addedItems.length) {
+    const names = addedItems.slice(0, 3).map(i => i.name).join('、');
+    const rest  = addedItems.length > 3 ? ` 他${addedItems.length - 3}件` : '';
+    msgs.push(`追加: ${names}${rest}`);
+  }
+  if (skipped) msgs.push(`在庫充足 ${skipped}件`);
+  showToast(msgs.length ? msgs.join(' / ') : '追加できる食材がありませんでした（調味料除く・在庫充足）');
+}
+
 // ======== 買い物追加シート ========
 let buySheetItems = [];
 

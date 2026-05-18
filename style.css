@@ -723,6 +723,53 @@ select.field {
 }
 .step-list li { font-size: .88rem; line-height: 1.5; }
 
+/* ======== カレンダー複数日一括追加 ======== */
+.cal-multi-buy-btn {
+  font-size: 1.1rem;
+  margin-left: 4px;
+}
+.multi-buy-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.multi-buy-range-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.multi-buy-date-input { font-size: .85rem; padding: 6px 8px; }
+.multi-buy-range-sep { font-size: 1rem; color: var(--muted); flex-shrink: 0; margin-top: 18px; }
+.multi-buy-preview {
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+}
+.multi-buy-day-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: .83rem;
+}
+.multi-buy-day-row:last-child { border-bottom: none; }
+.multi-buy-date-lbl {
+  font-weight: 700;
+  color: var(--text);
+  min-width: 36px;
+  flex-shrink: 0;
+}
+.multi-buy-slots { color: var(--muted); }
+.multi-buy-slot { margin-right: 6px; }
+.multi-buy-empty { font-size: .82rem; color: var(--muted); margin: 4px 0; text-align: center; }
+.multi-buy-note { font-size: .73rem; color: var(--muted); margin: 4px 0 0; line-height: 1.4; }
+
 /* ======== 献立シート スロット別人数行 ======== */
 .servings-row-slot {
   display: flex;
