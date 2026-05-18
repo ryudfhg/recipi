@@ -554,14 +554,15 @@ function renderCalendar() {
 
 function getMealSlot(dateKey, slot) {
   const day = meals[dateKey];
-  if (!day || !day[slot]) return { names: [], p1: true, p2: true };
+  const def = getDefaultServings();
+  if (!day || !day[slot]) return { names: [], p1: true, p2: true, servings: def };
   const m = day[slot];
   // 旧フォーマット（文字列）の互換対応
-  if (typeof m === 'string') return { names: m ? [m] : [], p1: true, p2: true };
+  if (typeof m === 'string') return { names: m ? [m] : [], p1: true, p2: true, servings: def };
   // 新フォーマット: names[]
-  if (Array.isArray(m.names)) return { names: m.names, p1: m.p1 !== false, p2: m.p2 !== false };
+  if (Array.isArray(m.names)) return { names: m.names, p1: m.p1 !== false, p2: m.p2 !== false, servings: m.servings || def };
   // 旧フォーマット（name単体）の互換対応
-  return { names: m.name ? [m.name] : [], p1: m.p1 !== false, p2: m.p2 !== false };
+  return { names: m.name ? [m.name] : [], p1: m.p1 !== false, p2: m.p2 !== false, servings: m.servings || def };
 }
 
 function cellHTML(date, otherMonth) {
@@ -670,6 +671,13 @@ function buildMealEditorBlocks(key, names) {
         </div>
 
         <div class="servings-row-slot">
+          <span class="servings-slot-label">人数</span>
+          <div class="servings-slot-ctrl">
+            <button class="qty-btn" type="button" onclick="changeSlotServings('${slot}',-1)">−</button>
+            <input type="number" class="servings-slot-input" id="servings-${slot}" value="${m.servings}" min="1" inputmode="numeric">
+            <button class="qty-btn" type="button" onclick="changeSlotServings('${slot}',1)">＋</button>
+            <span class="servings-slot-unit">人分</span>
+          </div>
           <button class="servings-slot-add-btn" onclick="openBuySheet('${slot}')">🛒 買い物リストに追加</button>
         </div>
         <div class="attend-row">
@@ -691,6 +699,17 @@ function buildMealEditorBlocks(key, names) {
     const m = getMealSlot(key, slot);
     sheetAttend[slot] = { p1: m.p1, p2: m.p2 };
   });
+}
+
+function getMealSlotServings(slot) {
+  const el = document.getElementById(`servings-${slot}`);
+  return parseInt(el?.value) || getDefaultServings();
+}
+
+function changeSlotServings(slot, delta) {
+  const el = document.getElementById(`servings-${slot}`);
+  if (!el) return;
+  el.value = Math.max(1, (parseInt(el.value) || getDefaultServings()) + delta);
 }
 
 function toggleMealBlock(slot) {
@@ -720,10 +739,11 @@ function openRecipePreview(slot, initialIdx) {
   ).join('');
 
   // パネル生成
+  const slotServings = slot ? getMealSlotServings(slot) : null;
   const contentEl = document.getElementById('rp-content');
   contentEl.innerHTML = names.map((n, i) => {
     const r = recipes.find(r => r.name === n);
-    return `<div class="rp-panel${i === initialIdx ? '' : ' hidden'}" id="rp-panel-${i}">${r ? recipeViewHTML(r) : '<p class="rv-empty">レシピが見つかりません</p>'}</div>`;
+    return `<div class="rp-panel${i === initialIdx ? '' : ' hidden'}" id="rp-panel-${i}">${r ? recipeViewHTML(r, slotServings) : '<p class="rv-empty">レシピが見つかりません</p>'}</div>`;
   }).join('');
 
   // 献立シートを先に閉じてからプレビューを全面表示
@@ -743,10 +763,14 @@ function switchRpTab(idx) {
   document.getElementById('rp-content').scrollTop = 0;
 }
 
-function recipeViewHTML(r) {
+function recipeViewHTML(r, displayServings = null) {
+  const baseServings = r.servings || 2;
+  const ratio = displayServings != null ? displayServings / baseServings : 1;
+
   // メタ情報チップ
   const chips = [];
-  if (r.servings)    chips.push(`<span class="rp-meta-chip">🍽 ${r.servings}人分</span>`);
+  const servLabel = displayServings != null ? displayServings : r.servings;
+  if (servLabel)     chips.push(`<span class="rp-meta-chip">🍽 ${servLabel}人分</span>`);
   if (r.cookTime)    chips.push(`<span class="rp-meta-chip">⏱ ${parseInt(r.cookTime) < 60 ? parseInt(r.cookTime)+'分' : Math.floor(parseInt(r.cookTime)/60)+'時間'+(parseInt(r.cookTime)%60 ? parseInt(r.cookTime)%60+'分' : '')}</span>`);
   if (r.storageTime) chips.push(`<span class="rp-meta-chip">📦 ${esc(r.storageTime)}</span>`);
 
@@ -767,18 +791,23 @@ function recipeViewHTML(r) {
       groups[cat].push(i);
     });
     const rows = Object.entries(groups).map(([cat, items]) =>
-      items.map(i => `
+      items.map(i => {
+        const n = toNum(i.qty);
+        const scaledQty = (!isNaN(n) && n > 0) ? fmtQty(n * ratio) : i.qty;
+        return `
         <div class="rp-ing-row">
           <span class="ing-cat-dot" data-cat="${esc(cat)}"></span>
           <span class="rp-ing-name">${esc(i.name)}</span>
-          <span class="rp-ing-qty">${esc(i.qty)}${esc(i.unit)}</span>
-        </div>`).join('')
+          <span class="rp-ing-qty">${esc(scaledQty)}${esc(i.unit)}</span>
+        </div>`;
+      }).join('')
     ).join('');
+    const ingServLabel = displayServings != null ? displayServings : (r.servings || 2);
     ingsHTML = `
       <div class="rp-section">
         <div class="rp-section-label">
           <span class="rp-section-icon">🥬</span>材料
-          <span class="rp-section-sub">（${r.servings || 2}人分）</span>
+          <span class="rp-section-sub">（${ingServLabel}人分）</span>
         </div>
         <div class="rp-ing-grid">${rows}</div>
       </div>`;
@@ -1001,7 +1030,6 @@ let buySheetItems = [];
 function openBuySheet(slot) {
   const slots = slot === 'all' ? ['morning', 'noon', 'night'] : [slot];
   const slotLabels = { morning: '朝食', noon: '昼食', night: '夕食' };
-  const defaultServ = getDefaultServings();
 
   buySheetItems = [];
   slots.forEach(s => {
@@ -1018,7 +1046,7 @@ function openBuySheet(slot) {
       </div>
       <div class="buy-servings-wrap">
         <input type="number" class="field buy-serv-input" id="buy-serv-${i}"
-          value="${defaultServ}" min="1" inputmode="numeric">
+          value="${getMealSlotServings(item.slot)}" min="1" inputmode="numeric">
         <span class="buy-serv-unit">人分</span>
       </div>
     </div>
@@ -1109,9 +1137,10 @@ async function saveMeal() {
     meals[editingKey] = {};
     ['morning','noon','night'].forEach(slot => {
       meals[editingKey][slot] = {
-        names: slotsNames[slot],
-        p1:    sheetAttend[slot].p1,
-        p2:    sheetAttend[slot].p2
+        names:    slotsNames[slot],
+        p1:       sheetAttend[slot].p1,
+        p2:       sheetAttend[slot].p2,
+        servings: getMealSlotServings(slot)
       };
     });
   } else {

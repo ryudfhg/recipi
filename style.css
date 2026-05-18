@@ -729,10 +729,16 @@ select.field {
   align-items: center;
   gap: 6px;
   margin: 6px 0;
+  flex-wrap: wrap;
+}
+.servings-slot-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .servings-slot-label { font-size: .85rem; color: var(--muted); white-space: nowrap; }
 .servings-slot-unit  { font-size: .8rem; color: var(--muted); }
-.servings-slot-input { width: 52px; text-align: center; padding: 5px 6px; font-size: .88rem; font-weight: 700; margin: 0; }
+.servings-slot-input { width: 44px; text-align: center; padding: 4px 4px; font-size: .88rem; font-weight: 700; margin: 0; border: 1px solid #ddd; border-radius: 6px; }
 .servings-slot-add-btn {
   margin-left: auto;
   padding: 5px 11px;
