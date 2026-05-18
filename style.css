@@ -67,10 +67,13 @@ body {
 
 /* ======== 在庫フィルターパネル ======== */
 .stock-filter-panel {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 100;
   background: white;
   border-radius: 0 0 14px 14px;
   padding: 10px 12px 8px;
-  margin-bottom: 8px;
+  margin: -12px -12px 8px;   /* タブの12px paddingを打ち消して端まで広げる */
   box-shadow: 0 2px 8px rgba(0,0,0,.08);
 }
 .stock-filter-panel.hidden { display: none; }

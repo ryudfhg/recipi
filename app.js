@@ -1412,9 +1412,12 @@ async function addCheckedToStock() {
   bought.forEach(i => {
     const existing = stocks.find(s => s.name === i.name && (s.unit || '') === (i.unit || ''));
     if (existing) {
-      existing.qty = (toNum(String(existing.qty)) || 0) + (toNum(i.qty) || 1);
+      const newQty = (toNum(String(existing.qty)) || 0) + (toNum(i.qty) || 1);
+      existing.qty    = newQty;
+      existing.qtyStr = fmtQty(newQty);
     } else {
-      stocks.push({ id: Date.now() + Math.random(), name: i.name, qty: toNum(i.qty) || 1, unit: i.unit || '', expiry: '', cat: i.cat || '' });
+      const newQty = toNum(i.qty) || 1;
+      stocks.push({ id: Date.now() + Math.random(), name: i.name, qty: newQty, qtyStr: fmtQty(newQty), unit: i.unit || '', expiry: '', cat: i.cat || getCategories()[0] || 'その他' });
     }
   });
   shopItems = shopItems.filter(i => !i.checked);
