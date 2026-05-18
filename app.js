@@ -896,14 +896,12 @@ function applyNeededToShopList(neededMap) {
   const addedItems = [];
   let skipped = 0;
   Object.values(neededMap).forEach(item => {
-    // 調味料カテゴリは献立からの追加対象外
     if ((item.cat || '') === '調味料') return;
     const inStock = stocks
       .filter(s => s.name === item.name && (s.unit || '') === item.unit)
       .reduce((sum, s) => sum + (toNum(String(s.qty)) || 0), 0);
     const existing = shopItems.find(i => i.name === item.name && i.unit === item.unit && !i.checked);
     if (existing) {
-      // totalNeeded がない場合は現在のqty+在庫から推計
       const prevTotal = existing.totalNeeded ?? (toNum(existing.qty) || 0) + inStock;
       existing.totalNeeded = prevTotal + item.qty;
       const newRequired = Math.max(0, existing.totalNeeded - inStock);
@@ -948,8 +946,9 @@ function showAddResultPanel(rows) {
       `<span class="result-item">${esc(i.name)}${i.qty && i.qty !== '0' ? ` ${esc(i.qty)}${esc(i.unit)}` : ''}</span>`
     ).join('');
     const stockNote = r.skipped ? `<span class="result-stock">在庫充足 ${r.skipped}件</span>` : '';
+    const servLabel = r.servings != null ? ` ${r.servings}人分` : '';
     return `<div class="result-row">
-      <span class="result-label">${esc(r.label)} ${r.servings}人分</span>
+      <span class="result-label">${esc(r.label)}${servLabel}</span>
       <div class="result-items">${itemList || '<span class="result-none">材料なし</span>'}${stockNote}</div>
     </div>`;
   }).join('');
@@ -1052,11 +1051,18 @@ async function executeBuyFromSheet() {
 
   if (!Object.keys(needed).length) { showToast('材料が登録されたレシピがありません', 'error'); return; }
 
-  const { addedItems } = applyNeededToShopList(needed);
+  const rowsData = buySheetItems.map((item, i) => {
+    const servings = parseInt(document.getElementById(`buy-serv-${i}`)?.value) || getDefaultServings();
+    return { label: item.name, servings };
+  });
+
+  const { addedItems, skipped } = applyNeededToShopList(needed);
   renderShopItems();
   await pushData();
   closeBuySheet();
-  showToast(`${addedItems.length}件を買い物リストに追加しました`);
+  const label = rowsData.map(r => r.label).join('・');
+  const servings = rowsData.length === 1 ? rowsData[0].servings : null;
+  showAddResultPanel([{ label, servings, addedItems, skipped }]);
 }
 
 async function addSlotToShopList(slot) {
@@ -1293,7 +1299,7 @@ function renderStocks() {
   const list = document.getElementById('stock-list');
 
   // カテゴリ・状態フィルター適用
-  let filtered = stocks.map(s => ({ ...s, cat: s.cat || getCategories()[0] || 'その他' })); // 旧データ互換
+  let filtered = stocks.map(s => ({ ...s, cat: s.cat || getCategories()[0] || 'その他' }));
   if (stockCatFilters.size > 0)    filtered = filtered.filter(s => stockCatFilters.has(s.cat));
   if (stockStatusFilters.size > 0) filtered = filtered.filter(s => stockStatusFilters.has(getStatus(s)));
 
@@ -1302,25 +1308,24 @@ function renderStocks() {
     return;
   }
 
-  // カテゴリ別にグループ化
-  if (stockCatFilters.size === 0) {
-    const stockCats = getStockCategories();
-    const groups = {};
-    stockCats.forEach(c => { groups[c] = []; });
-    filtered.forEach(s => {
-      const c = s.cat || stockCats[0] || 'その他';
-      if (groups[c]) groups[c].push(s); else { groups[c] = [s]; }
-    });
-    list.innerHTML = stockCats.map(cat => {
-      if (!groups[cat].length) return '';
-      return `<div class="stock-group">
-        <div class="stock-group-label">${cat}</div>
-        ${groups[cat].map(s => stockCardHTML(s)).join('')}
-      </div>`;
-    }).join('');
-  } else {
-    list.innerHTML = filtered.map(s => stockCardHTML(s)).join('');
-  }
+  // 常にカテゴリ別グループ表示
+  const cats = getStockCategories();
+  const groups = {};
+  cats.forEach(c => { groups[c] = []; });
+  filtered.forEach(s => {
+    if (groups[s.cat]) groups[s.cat].push(s);
+    else { groups[s.cat] = [s]; } // 設定外カテゴリも保持
+  });
+
+  // 設定内カテゴリ → 設定外カテゴリの順で出力
+  const allCats = [...cats, ...Object.keys(groups).filter(c => !cats.includes(c))];
+  list.innerHTML = allCats.map(cat => {
+    if (!groups[cat] || !groups[cat].length) return '';
+    return `<div class="stock-group">
+      <div class="stock-group-label">${esc(cat)}</div>
+      ${groups[cat].map(s => stockCardHTML(s)).join('')}
+    </div>`;
+  }).join('');
 }
 
 function stockCardHTML(s) {
@@ -1425,7 +1430,9 @@ async function addCheckedToStock() {
   renderStocks();
   renderShopItems();
   await pushData();
-  showToast(`${bought.length}件を在庫に追加しました`);
+  const names = bought.map(i => i.name);
+  const nameLabel = names.slice(0, 3).join('、') + (names.length > 3 ? ` 他${names.length - 3}件` : '');
+  showToast(`在庫に追加: ${nameLabel}`);
 }
 
 async function moveToStock() {

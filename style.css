@@ -1259,6 +1259,7 @@ select.field {
 
 /* ======== 設定タブ ======== */
 .setting-desc { font-size: .82rem; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
+.app-version { text-align: center; font-size: .75rem; color: var(--muted); margin-top: 20px; padding-bottom: 4px; }
 .id-box {
   background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px;
   padding: 10px 12px; font-size: .8rem; font-family: monospace; word-break: break-all; margin-bottom: 12px;
