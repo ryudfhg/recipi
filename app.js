@@ -554,15 +554,14 @@ function renderCalendar() {
 
 function getMealSlot(dateKey, slot) {
   const day = meals[dateKey];
-  const def = getDefaultServings();
-  if (!day || !day[slot]) return { names: [], p1: true, p2: true, servings: def };
+  if (!day || !day[slot]) return { names: [], p1: true, p2: true, servingsArr: [] };
   const m = day[slot];
   // 旧フォーマット（文字列）の互換対応
-  if (typeof m === 'string') return { names: m ? [m] : [], p1: true, p2: true, servings: def };
+  if (typeof m === 'string') return { names: m ? [m] : [], p1: true, p2: true, servingsArr: [] };
   // 新フォーマット: names[]
-  if (Array.isArray(m.names)) return { names: m.names, p1: m.p1 !== false, p2: m.p2 !== false, servings: m.servings || def };
+  if (Array.isArray(m.names)) return { names: m.names, p1: m.p1 !== false, p2: m.p2 !== false, servingsArr: m.servingsArr || [] };
   // 旧フォーマット（name単体）の互換対応
-  return { names: m.name ? [m.name] : [], p1: m.p1 !== false, p2: m.p2 !== false, servings: m.servings || def };
+  return { names: m.name ? [m.name] : [], p1: m.p1 !== false, p2: m.p2 !== false, servingsArr: m.servingsArr || [] };
 }
 
 function cellHTML(date, otherMonth) {
@@ -628,19 +627,33 @@ function getMealSlotNames(slot) {
   return el ? JSON.parse(el.dataset.values || '[]') : [];
 }
 
-function renderSlotRecipeTags(slot, nameArr) {
+function renderSlotRecipeTags(slot, nameArr, servArr) {
   if (!nameArr.length) return '';
-  return nameArr.map((n, i) =>
-    `<span class="recipe-tag"><span class="recipe-tag-name" onclick="openRecipePreview('${slot}',${i})">${esc(n)}</span><button class="recipe-tag-del" onclick="removeRecipeFromSlot('${slot}',${i})">✕</button></span>`
-  ).join('');
+  const def = getDefaultServings();
+  return nameArr.map((n, i) => {
+    const sv = (servArr && servArr[i] != null) ? servArr[i] : def;
+    return `<span class="recipe-tag">
+      <span class="recipe-tag-name" onclick="openRecipePreview('${slot}',${i})">${esc(n)}</span>
+      <span class="recipe-serv-ctrl">
+        <button class="recipe-serv-btn" type="button" onclick="changeRecipeServings('${slot}',${i},-1)">−</button>
+        <span class="recipe-serv-val" id="rp-serv-val-${slot}-${i}">${sv}</span>
+        <button class="recipe-serv-btn" type="button" onclick="changeRecipeServings('${slot}',${i},1)">＋</button>
+        <span class="recipe-serv-unit">人</span>
+      </span>
+      <button class="recipe-tag-del" onclick="removeRecipeFromSlot('${slot}',${i})">✕</button>
+    </span>`;
+  }).join('');
 }
 
 function removeRecipeFromSlot(slot, index) {
   const el = document.getElementById(`meal-names-${slot}`);
   if (!el) return;
   const arr = JSON.parse(el.dataset.values || '[]');
+  const servArr = JSON.parse(el.dataset.servings || '[]');
   arr.splice(index, 1);
+  servArr.splice(index, 1);
   el.dataset.values = JSON.stringify(arr);
+  el.dataset.servings = JSON.stringify(servArr);
   refreshMealSlotUI(slot);
 }
 
@@ -655,6 +668,7 @@ function buildMealEditorBlocks(key, names) {
   container.innerHTML = slotDefs.map(({ slot, icon, label }) => {
     const m = getMealSlot(key, slot);
     const namesJson = esc(JSON.stringify(m.names));
+    const servJson  = esc(JSON.stringify(m.servingsArr));
     const previewTxt = m.names.length ? esc(m.names.join('・')) : '';
     return `
     <div class="meal-block" id="meal-block-${slot}">
@@ -665,19 +679,12 @@ function buildMealEditorBlocks(key, names) {
         <span class="meal-block-chevron" id="meal-chevron-${slot}">▶</span>
       </div>
       <div class="meal-block-body hidden" id="meal-block-body-${slot}">
-        <div class="meal-recipes-col" id="meal-names-${slot}" data-values="${namesJson}">
-          ${renderSlotRecipeTags(slot, m.names)}
+        <div class="meal-recipes-col" id="meal-names-${slot}" data-values="${namesJson}" data-servings="${servJson}">
+          ${renderSlotRecipeTags(slot, m.names, m.servingsArr)}
           <button class="add-recipe-btn" onclick="openRecipePicker('${slot}')">＋ レシピを追加</button>
         </div>
 
         <div class="servings-row-slot">
-          <span class="servings-slot-label">人数</span>
-          <div class="servings-slot-ctrl">
-            <button class="qty-btn" type="button" onclick="changeSlotServings('${slot}',-1)">−</button>
-            <input type="number" class="servings-slot-input" id="servings-${slot}" value="${m.servings}" min="1" inputmode="numeric">
-            <button class="qty-btn" type="button" onclick="changeSlotServings('${slot}',1)">＋</button>
-            <span class="servings-slot-unit">人分</span>
-          </div>
           <button class="servings-slot-add-btn" onclick="openBuySheet('${slot}')">🛒 買い物リストに追加</button>
         </div>
         <div class="attend-row">
@@ -701,15 +708,26 @@ function buildMealEditorBlocks(key, names) {
   });
 }
 
-function getMealSlotServings(slot) {
-  const el = document.getElementById(`servings-${slot}`);
-  return parseInt(el?.value) || getDefaultServings();
+function getMealSlotServingsArr(slot) {
+  const el = document.getElementById(`meal-names-${slot}`);
+  return el ? JSON.parse(el.dataset.servings || '[]') : [];
 }
 
-function changeSlotServings(slot, delta) {
-  const el = document.getElementById(`servings-${slot}`);
+function getMealRecipeServings(slot, index) {
+  const arr = getMealSlotServingsArr(slot);
+  return arr[index] || getDefaultServings();
+}
+
+function changeRecipeServings(slot, index, delta) {
+  const el = document.getElementById(`meal-names-${slot}`);
   if (!el) return;
-  el.value = Math.max(1, (parseInt(el.value) || getDefaultServings()) + delta);
+  const nameArr = JSON.parse(el.dataset.values || '[]');
+  const servArr = JSON.parse(el.dataset.servings || '[]');
+  while (servArr.length < nameArr.length) servArr.push(getDefaultServings());
+  servArr[index] = Math.max(1, (servArr[index] || getDefaultServings()) + delta);
+  el.dataset.servings = JSON.stringify(servArr);
+  const valEl = document.getElementById(`rp-serv-val-${slot}-${index}`);
+  if (valEl) valEl.textContent = servArr[index];
 }
 
 function toggleMealBlock(slot) {
@@ -739,11 +757,12 @@ function openRecipePreview(slot, initialIdx) {
   ).join('');
 
   // パネル生成
-  const slotServings = slot ? getMealSlotServings(slot) : null;
+  const servArr = slot ? getMealSlotServingsArr(slot) : [];
   const contentEl = document.getElementById('rp-content');
   contentEl.innerHTML = names.map((n, i) => {
     const r = recipes.find(r => r.name === n);
-    return `<div class="rp-panel${i === initialIdx ? '' : ' hidden'}" id="rp-panel-${i}">${r ? recipeViewHTML(r, slotServings) : '<p class="rv-empty">レシピが見つかりません</p>'}</div>`;
+    const sv = servArr[i] != null ? servArr[i] : null;
+    return `<div class="rp-panel${i === initialIdx ? '' : ' hidden'}" id="rp-panel-${i}">${r ? recipeViewHTML(r, sv) : '<p class="rv-empty">レシピが見つかりません</p>'}</div>`;
   }).join('');
 
   // 献立シートを先に閉じてからプレビューを全面表示
@@ -839,7 +858,8 @@ function refreshMealSlotUI(slot) {
   const el = document.getElementById(`meal-names-${slot}`);
   if (!el) return;
   const arr = JSON.parse(el.dataset.values || '[]');
-  el.innerHTML = renderSlotRecipeTags(slot, arr) +
+  const servArr = JSON.parse(el.dataset.servings || '[]');
+  el.innerHTML = renderSlotRecipeTags(slot, arr, servArr) +
     `<button class="add-recipe-btn" onclick="openRecipePicker('${slot}')">＋ レシピを追加</button>`;
   const preview = document.getElementById(`meal-preview-${slot}`);
   if (preview) preview.textContent = arr.length ? arr.join('・') : '';
@@ -991,16 +1011,17 @@ async function addMealDayToShopList() {
     slot,
     label:    slotLabels[slot],
     names:    getMealSlotNames(slot),
-    servings: parseInt(document.getElementById(`servings-${slot}`)?.value) || getDefaultServings()
+    servArr:  getMealSlotServingsArr(slot)
   })).filter(s => s.names.length > 0);
 
   if (!slotData.length) { showToast('献立が選択されていません', 'error'); return; }
 
   const needed = {};
-  slotData.forEach(({ names, servings }) => {
-    names.forEach(name => {
+  slotData.forEach(({ slot, names, servArr }) => {
+    names.forEach((name, idx) => {
       const recipe = recipes.find(r => r.name === name);
       if (!recipe || !recipe.ingredients.length) return;
+      const servings = servArr[idx] != null ? servArr[idx] : getDefaultServings();
       const ratio = servings / (recipe.servings || 2);
       recipe.ingredients.forEach(ing => {
         const rawQty = toNum(ing.qty);
@@ -1018,10 +1039,7 @@ async function addMealDayToShopList() {
   renderShopItems();
   await pushData();
 
-  // 全スロットまとめて1行で表示
-  const allServings = [...new Set(slotData.map(s => s.servings))];
-  const servLabel = allServings.length === 1 ? allServings[0] : slotData.map(s => s.servings).join('/');
-  showAddResultPanel([{ label: '全スロット', servings: servLabel, addedItems, skipped }]);
+  showAddResultPanel([{ label: '全スロット', servings: null, addedItems, skipped }]);
 }
 
 // ======== 買い物追加シート ========
@@ -1033,7 +1051,9 @@ function openBuySheet(slot) {
 
   buySheetItems = [];
   slots.forEach(s => {
-    getMealSlotNames(s).forEach(name => buySheetItems.push({ slot: s, name }));
+    const names = getMealSlotNames(s);
+    const servArr = getMealSlotServingsArr(s);
+    names.forEach((name, idx) => buySheetItems.push({ slot: s, name, servings: servArr[idx] != null ? servArr[idx] : getDefaultServings() }));
   });
 
   if (!buySheetItems.length) { showToast('レシピが選択されていません', 'error'); return; }
@@ -1046,7 +1066,7 @@ function openBuySheet(slot) {
       </div>
       <div class="buy-servings-wrap">
         <input type="number" class="field buy-serv-input" id="buy-serv-${i}"
-          value="${getMealSlotServings(item.slot)}" min="1" inputmode="numeric">
+          value="${item.servings}" min="1" inputmode="numeric">
         <span class="buy-serv-unit">人分</span>
       </div>
     </div>
@@ -1098,12 +1118,13 @@ async function addSlotToShopList(slot) {
   if (!names.length) { showToast('レシピが選択されていません', 'error'); return; }
 
   const slotLabels = { morning: '朝食', noon: '昼食', night: '夕食' };
-  const servings = parseInt(document.getElementById(`servings-${slot}`)?.value) || getDefaultServings();
+  const servArr = getMealSlotServingsArr(slot);
   const needed = {};
 
-  names.forEach(name => {
+  names.forEach((name, idx) => {
     const recipe = recipes.find(r => r.name === name);
     if (!recipe || !recipe.ingredients.length) return;
+    const servings = servArr[idx] != null ? servArr[idx] : getDefaultServings();
     const ratio = servings / (recipe.servings || 2);
     recipe.ingredients.forEach(ing => {
       const rawQty = toNum(ing.qty);
@@ -1137,10 +1158,10 @@ async function saveMeal() {
     meals[editingKey] = {};
     ['morning','noon','night'].forEach(slot => {
       meals[editingKey][slot] = {
-        names:    slotsNames[slot],
-        p1:       sheetAttend[slot].p1,
-        p2:       sheetAttend[slot].p2,
-        servings: getMealSlotServings(slot)
+        names:       slotsNames[slot],
+        p1:          sheetAttend[slot].p1,
+        p2:          sheetAttend[slot].p2,
+        servingsArr: getMealSlotServingsArr(slot)
       };
     });
   } else {
@@ -1642,8 +1663,12 @@ function selectRecipeForSlot(name) {
   if (el) {
     const arr = JSON.parse(el.dataset.values || '[]');
     if (!arr.includes(name)) {
+      const servArr = JSON.parse(el.dataset.servings || '[]');
+      const recipe = recipes.find(r => r.name === name);
       arr.push(name);
+      servArr.push(recipe?.servings || getDefaultServings());
       el.dataset.values = JSON.stringify(arr);
+      el.dataset.servings = JSON.stringify(servArr);
       refreshMealSlotUI(pickerSlot);
     }
   }

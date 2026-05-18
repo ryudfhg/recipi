@@ -769,14 +769,12 @@ select.field {
   background: var(--green-lt);
   border: 1.5px solid var(--green);
   color: var(--green-dk);
+  flex-wrap: nowrap;
   border-radius: 20px;
   padding: 4px 8px 4px 10px;
   font-size: .8rem;
   font-weight: 600;
   white-space: nowrap;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .recipe-tag-del {
   background: none;
@@ -790,6 +788,35 @@ select.field {
   opacity: .7;
 }
 .recipe-tag-del:active { opacity: 1; }
+.recipe-serv-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border-left: 1px solid var(--green);
+  padding-left: 4px;
+  margin-left: 2px;
+}
+.recipe-serv-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: .72rem;
+  color: var(--green-dk);
+  padding: 0 2px;
+  line-height: 1;
+  font-weight: 700;
+}
+.recipe-serv-btn:active { opacity: .6; }
+.recipe-serv-val {
+  font-size: .78rem;
+  font-weight: 700;
+  min-width: 14px;
+  text-align: center;
+}
+.recipe-serv-unit {
+  font-size: .68rem;
+  color: var(--muted);
+}
 .add-recipe-btn {
   background: none;
   border: 1.5px dashed var(--border);
@@ -1057,6 +1084,9 @@ select.field {
   cursor: pointer;
   text-decoration: underline dotted var(--muted);
   text-underline-offset: 2px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .recipe-tag-name:active { opacity: .6; }
 
