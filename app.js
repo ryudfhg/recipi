@@ -95,11 +95,15 @@ function applyData(data) {
   stocks    = data.stocks    || [];
   shopItems = data.shopItems || [];
   recipes   = data.recipes   || [];
-  if (data.ingCategories) localStorage.setItem('ingCategories', JSON.stringify(data.ingCategories));
-  if (data.stockCats)     localStorage.setItem('stockCats',     JSON.stringify(data.stockCats));
-  if (data.recipeCats)    localStorage.setItem('recipeCats',    JSON.stringify(data.recipeCats));
+  // 旧データ互換：stockCats と ingCategories を統合して保存
+  if (data.ingCategories || data.stockCats) {
+    const merged = [...(data.ingCategories || DEFAULT_CATEGORIES)];
+    (data.stockCats || []).forEach(c => { if (!merged.includes(c)) merged.push(c); });
+    localStorage.setItem('ingCategories', JSON.stringify(merged));
+  }
+  if (data.recipeCats) localStorage.setItem('recipeCats', JSON.stringify(data.recipeCats));
   lastSyncJSON = JSON.stringify({ meals, stocks, shopItems, recipes,
-    ingCategories: getCategories(), stockCats: getStockCategories(), recipeCats: getRecipeCategories() });
+    ingCategories: getCategories(), recipeCats: getRecipeCategories() });
   saveLocal();
 }
 
@@ -126,10 +130,15 @@ async function fetchData() {
   if (!res.ok) {
     let body = '';
     try { body = await res.text(); } catch(_) {}
-    const msg = `[読込] HTTP ${res.status} ${res.statusText}${body ? ' / ' + body.slice(0,80) : ''}`;
+    let msg;
+    if (res.status === 401 || res.status === 403 || (body && body.includes('Permission denied'))) {
+      msg = `[読込] Firebaseのアクセス権限エラー (${res.status})。Firebaseコンソール → Realtime Database → ルール で「.read」と「.write」を true に設定し直してください。`;
+    } else {
+      msg = `[読込] HTTP ${res.status} ${res.statusText}${body ? ' / ' + body.slice(0,80) : ''}`;
+    }
     console.error(msg);
     showSync(msg, true);
-    setTimeout(hideSync, 6000);
+    setTimeout(hideSync, 12000);
     loadLocalSilent();
     return;
   }
@@ -168,7 +177,6 @@ async function pollSync() {
       shopItems:     data.shopItems     || [],
       recipes:       data.recipes       || [],
       ingCategories: data.ingCategories || [],
-      stockCats:     data.stockCats     || [],
       recipeCats:    data.recipeCats    || [],
     });
     if (newJSON === lastSyncJSON) return; // 変化なし
@@ -200,7 +208,7 @@ async function pushData() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ meals, stocks, shopItems, recipes,
-        ingCategories: getCategories(), stockCats: getStockCategories(), recipeCats: getRecipeCategories() })
+        ingCategories: getCategories(), recipeCats: getRecipeCategories() })
     });
   } catch(e) {
     saveLocal();
@@ -214,15 +222,20 @@ async function pushData() {
     saveLocal();
     let body = '';
     try { body = await res.text(); } catch(_) {}
-    const msg = `[保存] HTTP ${res.status} ${res.statusText}${body ? ' / ' + body.slice(0,80) : ''}`;
+    let msg;
+    if (res.status === 401 || res.status === 403 || (body && body.includes('Permission denied'))) {
+      msg = `[保存] Firebaseのアクセス権限エラー (${res.status})。Firebaseコンソール → Realtime Database → ルール で「.read」と「.write」を true に設定し直してください。`;
+    } else {
+      msg = `[保存] HTTP ${res.status} ${res.statusText}${body ? ' / ' + body.slice(0,80) : ''}`;
+    }
     console.error(msg);
     showSync(msg, true);
-    setTimeout(hideSync, 6000);
+    setTimeout(hideSync, 12000);
     return;
   }
   // 自分の保存内容をキャッシュ（ポーリングで自己更新を誤検知しないよう）
   lastSyncJSON = JSON.stringify({ meals, stocks, shopItems, recipes,
-    ingCategories: getCategories(), stockCats: getStockCategories(), recipeCats: getRecipeCategories() });
+    ingCategories: getCategories(), recipeCats: getRecipeCategories() });
   showSync('保存しました ✓');
   setTimeout(hideSync, 1500);
 }
@@ -250,7 +263,7 @@ async function setupBlob() {
 // ======== ローカルストレージ（file://用） ========
 function saveLocal() {
   localStorage.setItem('app_data', JSON.stringify({ meals, stocks, shopItems, recipes,
-    ingCategories: getCategories(), stockCats: getStockCategories(), recipeCats: getRecipeCategories() }));
+    ingCategories: getCategories(), recipeCats: getRecipeCategories() }));
 }
 function loadLocal() {
   loadLocalSilent();
@@ -262,9 +275,13 @@ function loadLocalSilent() {
   stocks    = data.stocks    || [];
   shopItems = data.shopItems || [];
   recipes   = data.recipes   || [];
-  if (data.ingCategories) localStorage.setItem('ingCategories', JSON.stringify(data.ingCategories));
-  if (data.stockCats)     localStorage.setItem('stockCats',     JSON.stringify(data.stockCats));
-  if (data.recipeCats)    localStorage.setItem('recipeCats',    JSON.stringify(data.recipeCats));
+  // 旧データ互換：stockCats と ingCategories を統合して保存
+  if (data.ingCategories || data.stockCats) {
+    const merged = [...(data.ingCategories || DEFAULT_CATEGORIES)];
+    (data.stockCats || []).forEach(c => { if (!merged.includes(c)) merged.push(c); });
+    localStorage.setItem('ingCategories', JSON.stringify(merged));
+  }
+  if (data.recipeCats) localStorage.setItem('recipeCats', JSON.stringify(data.recipeCats));
   renderAll();
 }
 
@@ -340,7 +357,7 @@ function renderAll() {
 }
 
 // ======== カテゴリ管理 ========
-const DEFAULT_CATEGORIES = ['野菜', '肉・魚', '乳製品', '調味料', 'その他'];
+const DEFAULT_CATEGORIES = ['野菜', '乳製品', '肉', '魚', '調味料', 'その他', '冷凍ストック'];
 
 function getCategories() {
   const s = localStorage.getItem('ingCategories');
@@ -362,6 +379,8 @@ function addCategory() {
   renderCatSettings();
   populateShopCatSelect();
   populateIngCatSelect();
+  renderStockCatFilters();
+  populateStockCatSelect();
   showToast(`「${name}」を追加しました`);
   pushData();
 }
@@ -373,6 +392,8 @@ function removeCategory(name) {
   renderCatSettings();
   populateShopCatSelect();
   populateIngCatSelect();
+  renderStockCatFilters();
+  populateStockCatSelect();
   pushData();
 }
 
@@ -1098,7 +1119,9 @@ async function saveMeal() {
 
 
 // ======== 在庫 ========
-const DEFAULT_STOCK_CATS = ['食材', '調味料', '冷凍ストック'];
+// カテゴリは食材カテゴリと統合（getCategories() を共用）
+function getStockCategories() { return getCategories(); }
+
 const stockCatFilters    = new Set();
 const recipeCatFilters   = new Set();
 
@@ -1122,57 +1145,11 @@ function renderRecipeCatFilters() {
 }
 const stockStatusFilters = new Set();
 
-function getStockCategories() {
-  const s = localStorage.getItem('stockCats');
-  return s ? JSON.parse(s) : [...DEFAULT_STOCK_CATS];
-}
-
-function saveStockCategories(cats) {
-  localStorage.setItem('stockCats', JSON.stringify(cats));
-}
-
-function addStockCategory() {
-  const name = document.getElementById('new-stock-cat-input').value.trim();
-  if (!name) return;
-  const cats = getStockCategories();
-  if (cats.includes(name)) { showToast('既に存在します', 'error'); return; }
-  cats.push(name);
-  saveStockCategories(cats);
-  document.getElementById('new-stock-cat-input').value = '';
-  renderStockCatSettings();
-  renderStockCatFilters();
-  populateStockCatSelect();
-  showToast(`「${name}」を追加しました`);
-  pushData();
-}
-
-function removeStockCategory(name) {
-  const cats = getStockCategories().filter(c => c !== name);
-  if (!cats.length) { showToast('カテゴリは最低1つ必要です', 'error'); return; }
-  saveStockCategories(cats);
-  renderStockCatSettings();
-  renderStockCatFilters();
-  populateStockCatSelect();
-  pushData();
-}
-
-function renderStockCatSettings() {
-  const el = document.getElementById('stock-cat-settings-list');
-  if (!el) return;
-  const cats = getStockCategories();
-  el.innerHTML = cats.map(c => `
-    <div class="cat-settings-item">
-      <span class="cat-settings-name">${esc(c)}</span>
-      <button class="del-btn" onclick="removeStockCategory('${esc(c)}')">✕</button>
-    </div>
-  `).join('');
-}
-
 function populateStockCatSelect() {
   const sel = document.getElementById('stock-cat-select');
   if (!sel) return;
   const prev = sel.value;
-  const cats = getStockCategories();
+  const cats = getCategories();
   sel.innerHTML = cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
 }
@@ -1180,7 +1157,7 @@ function populateStockCatSelect() {
 function renderStockCatFilters() {
   const container = document.getElementById('cat-filters');
   if (!container) return;
-  const cats = getStockCategories();
+  const cats = getCategories();
   container.innerHTML = `<button class="chip ${stockCatFilters.size === 0 ? 'active' : ''}" onclick="filterStockCat('all')">すべて</button>`
     + cats.map(c => `<button class="chip ${stockCatFilters.has(c) ? 'active' : ''}" onclick="filterStockCat('${esc(c)}')">${esc(c)}</button>`).join('');
 }
@@ -1192,7 +1169,7 @@ function openStockSheet(editId = null) {
   document.getElementById('stock-edit-id').value   = editId || '';
   document.getElementById('stock-sheet-title').textContent = s ? '在庫を編集' : '在庫を追加';
   document.getElementById('stock-sheet-btn').textContent  = s ? '保存する' : '追加する';
-  document.getElementById('stock-cat-select').value = s ? (s.cat || cats[0] || '食材') : (cats[0] || '食材');
+  document.getElementById('stock-cat-select').value = s ? (s.cat || cats[0] || 'その他') : (cats[0] || 'その他');
   document.getElementById('stock-name').value   = s ? s.name   : '';
   document.getElementById('stock-qty').value    = s ? s.qty    : '';
   document.getElementById('stock-unit').value   = s ? (s.unit || 'g') : 'g';
@@ -1258,7 +1235,7 @@ async function addStockToShopList(id) {
       name:    s.name,
       qty:     '1',
       unit:    s.unit || '',
-      cat:     cats.includes(s.cat) ? s.cat : (cats[0] || 'その他'),
+      cat:     s.cat || cats[0] || 'その他',
       checked: false,
       stockId: s.id
     });
@@ -1316,7 +1293,7 @@ function renderStocks() {
   const list = document.getElementById('stock-list');
 
   // カテゴリ・状態フィルター適用
-  let filtered = stocks.map(s => ({ ...s, cat: s.cat || '食材' })); // 旧データ互換
+  let filtered = stocks.map(s => ({ ...s, cat: s.cat || getCategories()[0] || 'その他' })); // 旧データ互換
   if (stockCatFilters.size > 0)    filtered = filtered.filter(s => stockCatFilters.has(s.cat));
   if (stockStatusFilters.size > 0) filtered = filtered.filter(s => stockStatusFilters.has(getStatus(s)));
 
@@ -1331,7 +1308,7 @@ function renderStocks() {
     const groups = {};
     stockCats.forEach(c => { groups[c] = []; });
     filtered.forEach(s => {
-      const c = s.cat || stockCats[0] || '食材';
+      const c = s.cat || stockCats[0] || 'その他';
       if (groups[c]) groups[c].push(s); else { groups[c] = [s]; }
     });
     list.innerHTML = stockCats.map(cat => {
@@ -1453,7 +1430,7 @@ async function moveToStock() {
   const bought = shopItems.filter(i => i.checked);
   if (bought.length) {
     bought.forEach(i => {
-      stocks.push({ id: Date.now() + Math.random(), name: i.name, qty: parseFloat(i.qty) || 1, unit: i.unit, expiry: '' });
+      stocks.push({ id: Date.now() + Math.random(), name: i.name, qty: parseFloat(i.qty) || 1, unit: i.unit, expiry: '', cat: i.cat || getCategories()[0] || 'その他' });
     });
     shopItems = shopItems.filter(i => !i.checked);
     recalcShopItemsFromStock();
@@ -1939,7 +1916,6 @@ function toggleDataSettings() {
 function updateSettingsView() {
   renderCatSettings();
   renderRecipeCatSettings();
-  renderStockCatSettings();
   const fbUrl = getFirebaseUrl();
   const key   = getDataKey();
   const names = getNames();
