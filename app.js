@@ -1205,7 +1205,7 @@ async function saveStockFromSheet() {
 
   if (editId) {
     const s = stocks.find(s => s.id === Number(editId));
-    if (s) Object.assign(s, { cat, name, qty, unit, expiry });
+    if (s) Object.assign(s, { cat, name, qty, qtyStr, unit, expiry });
   } else {
     stocks.push({ id: Date.now(), cat, name, qty, qtyStr, unit, expiry });
   }
