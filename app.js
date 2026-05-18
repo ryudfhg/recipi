@@ -1043,16 +1043,18 @@ async function addMealDayToShopList() {
 }
 
 // ======== 複数日一括買い物追加 ========
+// { dateKey, slot, recipeName, servings, checked }
+let multiSelectItems = [];
+
+const DOW_LABELS = ['日','月','火','水','木','金','土'];
+
 function getDaysInRange(fromStr, toStr) {
   const result = [];
   const from = new Date(fromStr + 'T00:00:00');
   const to   = new Date(toStr   + 'T00:00:00');
   if (isNaN(from) || isNaN(to) || from > to) return result;
   const cur = new Date(from);
-  while (cur <= to) {
-    result.push(dateKey(cur));
-    cur.setDate(cur.getDate() + 1);
-  }
+  while (cur <= to) { result.push(dateKey(cur)); cur.setDate(cur.getDate() + 1); }
   return result;
 }
 
@@ -1062,7 +1064,7 @@ function openMultiDayBuySheet() {
   end.setDate(end.getDate() + 6);
   document.getElementById('multi-buy-from').value = dateKey(today);
   document.getElementById('multi-buy-to').value   = dateKey(end);
-  renderMultiDayPreview();
+  loadMultiSelectItems();
   document.getElementById('multi-buy-overlay').classList.remove('hidden');
   document.getElementById('multi-buy-sheet').classList.remove('hidden');
 }
@@ -1072,65 +1074,106 @@ function closeMultiDayBuySheet() {
   document.getElementById('multi-buy-sheet').classList.add('hidden');
 }
 
-function renderMultiDayPreview() {
+function loadMultiSelectItems() {
   const from = document.getElementById('multi-buy-from').value;
   const to   = document.getElementById('multi-buy-to').value;
-  const el   = document.getElementById('multi-buy-preview');
-  if (!el) return;
-  if (!from || !to) { el.innerHTML = '<p class="multi-buy-empty">日付を選択してください</p>'; return; }
-  const slotLabels = { morning: '朝', noon: '昼', night: '夕' };
-  const days = getDaysInRange(from, to);
-  const daysWithMeals = days.filter(d =>
-    ['morning','noon','night'].some(slot => getMealSlot(d, slot).names.length > 0)
-  );
-  if (!daysWithMeals.length) {
-    el.innerHTML = '<p class="multi-buy-empty">この期間に献立がありません</p>';
-    return;
-  }
-  el.innerHTML = daysWithMeals.map(d => {
-    const [, m, dy] = d.split('-');
-    const label = `${parseInt(m)}/${parseInt(dy)}`;
-    const slots = ['morning','noon','night'].map(slot => {
-      const ms = getMealSlot(d, slot);
-      if (!ms.names.length) return '';
-      return `<span class="multi-buy-slot">${slotLabels[slot]}:${ms.names.join('・')}</span>`;
-    }).filter(Boolean).join('');
-    return `<div class="multi-buy-day-row">
-      <span class="multi-buy-date-lbl">${label}</span>
-      <span class="multi-buy-slots">${slots}</span>
-    </div>`;
-  }).join('');
-}
-
-async function executeMultiDayBuy() {
-  const from = document.getElementById('multi-buy-from').value;
-  const to   = document.getElementById('multi-buy-to').value;
-  if (!from || !to) { showToast('日付を選択してください', 'error'); return; }
-
-  const days = getDaysInRange(from, to);
-  const needed = {};
-
-  days.forEach(dk => {
+  if (!from || !to) { multiSelectItems = []; renderMultiSelectList(); return; }
+  multiSelectItems = [];
+  getDaysInRange(from, to).forEach(dk => {
     ['morning','noon','night'].forEach(slot => {
       const m = getMealSlot(dk, slot);
-      if (!m.names.length) return;
       m.names.forEach((name, idx) => {
-        const recipe = recipes.find(r => r.name === name);
-        if (!recipe || !(recipe.ingredients || []).length) return;
         const servings = (m.servingsArr && m.servingsArr[idx] != null) ? m.servingsArr[idx] : getDefaultServings();
-        const ratio = servings / (recipe.servings || 2);
-        recipe.ingredients.forEach(ing => {
-          const rawQty = toNum(ing.qty);
-          const scaled = isNaN(rawQty) || rawQty === 0 ? 0 : rawQty * ratio;
-          const key = `${ing.name}__${ing.unit || ''}`;
-          if (needed[key]) needed[key].qty += scaled;
-          else needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled };
-        });
+        multiSelectItems.push({ dateKey: dk, slot, recipeName: name, servings, checked: true });
       });
     });
   });
+  renderMultiSelectList();
+}
 
-  if (!Object.keys(needed).length) { showToast('期間内に材料が登録されたレシピがありません', 'error'); return; }
+function renderMultiSelectList() {
+  const el = document.getElementById('multi-buy-list');
+  if (!el) return;
+  if (!multiSelectItems.length) {
+    el.innerHTML = '<p class="multi-buy-empty">この期間に献立がありません</p>';
+    updateMsCount();
+    return;
+  }
+  const slotLabels = { morning: '朝', noon: '昼', night: '夕' };
+  const slotOrder  = { morning: 0, noon: 1, night: 2 };
+  // group by dateKey
+  const byDate = {};
+  multiSelectItems.forEach((item, idx) => {
+    if (!byDate[item.dateKey]) byDate[item.dateKey] = [];
+    byDate[item.dateKey].push({ ...item, idx });
+  });
+  el.innerHTML = Object.entries(byDate).map(([dk, items]) => {
+    const d = new Date(dk + 'T00:00:00');
+    const dateLabel = `${parseInt(dk.slice(5,7))}/${parseInt(dk.slice(8,10))}(${DOW_LABELS[d.getDay()]})`;
+    const allChecked = items.every(i => i.checked);
+    const someChecked = items.some(i => i.checked);
+    return `<div class="ms-date-group">
+      <label class="ms-date-header">
+        <input type="checkbox" class="ms-check" ${allChecked ? 'checked' : ''} ${!allChecked && someChecked ? 'data-indeterminate="1"' : ''}
+          onchange="toggleMultiSelectDate('${dk}', this.checked)">
+        <span class="ms-date-label">${dateLabel}</span>
+      </label>
+      ${items.sort((a,b) => slotOrder[a.slot] - slotOrder[b.slot]).map(item => `
+        <label class="ms-item">
+          <input type="checkbox" class="ms-check" ${item.checked ? 'checked' : ''}
+            onchange="toggleMultiSelectItem(${item.idx}, this.checked)">
+          <span class="ms-slot-badge ms-slot-${item.slot}">${slotLabels[item.slot]}</span>
+          <span class="ms-recipe-name">${esc(item.recipeName)}</span>
+          <span class="ms-serv">${item.servings}人</span>
+        </label>`).join('')}
+    </div>`;
+  }).join('');
+  // indeterminate の反映
+  el.querySelectorAll('[data-indeterminate="1"]').forEach(cb => { cb.indeterminate = true; });
+  updateMsCount();
+}
+
+function updateMsCount() {
+  const el = document.getElementById('ms-count');
+  if (!el) return;
+  const n = multiSelectItems.filter(i => i.checked).length;
+  el.textContent = n ? `${n}件選択中` : '';
+}
+
+function toggleMultiSelectItem(idx, checked) {
+  if (multiSelectItems[idx]) multiSelectItems[idx].checked = checked;
+  renderMultiSelectList();
+}
+
+function toggleMultiSelectDate(dk, checked) {
+  multiSelectItems.forEach(i => { if (i.dateKey === dk) i.checked = checked; });
+  renderMultiSelectList();
+}
+
+function toggleMultiSelectAll(checked) {
+  multiSelectItems.forEach(i => { i.checked = checked; });
+  renderMultiSelectList();
+}
+
+async function executeMultiDayBuy() {
+  const checked = multiSelectItems.filter(i => i.checked);
+  if (!checked.length) { showToast('レシピを選択してください', 'error'); return; }
+
+  const needed = {};
+  checked.forEach(({ recipeName, servings }) => {
+    const recipe = recipes.find(r => r.name === recipeName);
+    if (!recipe || !(recipe.ingredients || []).length) return;
+    const ratio = servings / (recipe.servings || 2);
+    recipe.ingredients.forEach(ing => {
+      const rawQty = toNum(ing.qty);
+      const scaled = isNaN(rawQty) || rawQty === 0 ? 0 : rawQty * ratio;
+      const key = `${ing.name}__${ing.unit || ''}`;
+      if (needed[key]) needed[key].qty += scaled;
+      else needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled };
+    });
+  });
+
+  if (!Object.keys(needed).length) { showToast('選択レシピに材料が登録されていません', 'error'); return; }
 
   const { addedItems, skipped } = applyNeededToShopList(needed);
   renderShopItems();

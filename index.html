@@ -444,23 +444,22 @@
 
   <!-- ===== 複数日一括買い物追加シート ===== -->
   <div id="multi-buy-overlay" class="sheet-bg hidden" onclick="closeMultiDayBuySheet()"></div>
-  <div id="multi-buy-sheet" class="bottom-sheet hidden">
+  <div id="multi-buy-sheet" class="bottom-sheet multi-buy-sheet hidden">
     <div class="sheet-handle"></div>
-    <h3>複数日まとめて買い物リストに追加</h3>
+    <h3>買い物リストに追加</h3>
     <div class="multi-buy-range">
-      <div class="multi-buy-range-row">
-        <label class="field-label">開始日</label>
-        <input type="date" class="field multi-buy-date-input" id="multi-buy-from" onchange="renderMultiDayPreview()">
-      </div>
+      <input type="date" class="field multi-buy-date-input" id="multi-buy-from" onchange="loadMultiSelectItems()">
       <span class="multi-buy-range-sep">〜</span>
-      <div class="multi-buy-range-row">
-        <label class="field-label">終了日</label>
-        <input type="date" class="field multi-buy-date-input" id="multi-buy-to" onchange="renderMultiDayPreview()">
-      </div>
+      <input type="date" class="field multi-buy-date-input" id="multi-buy-to" onchange="loadMultiSelectItems()">
     </div>
-    <div id="multi-buy-preview" class="multi-buy-preview"></div>
-    <p class="multi-buy-note">※ 指定期間の全レシピ食材を合算し、在庫分を1回だけ差し引いて追加します</p>
-    <button class="primary-btn full" style="margin-top:8px" onclick="executeMultiDayBuy()">買い物リストに追加</button>
+    <div class="ms-toolbar">
+      <button class="ms-toolbar-btn" onclick="toggleMultiSelectAll(true)">すべて選択</button>
+      <button class="ms-toolbar-btn" onclick="toggleMultiSelectAll(false)">すべて解除</button>
+      <span class="ms-count" id="ms-count"></span>
+    </div>
+    <div id="multi-buy-list" class="multi-buy-list"></div>
+    <p class="multi-buy-note">選択したレシピの食材を合算し、在庫分を差し引いて追加します</p>
+    <button class="primary-btn full" style="margin-top:6px" onclick="executeMultiDayBuy()">買い物リストに追加</button>
   </div>
 
   <!-- ===== 買い物追加シート ===== -->
