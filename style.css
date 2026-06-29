@@ -472,8 +472,10 @@ select.field {
 .shop-card.checked { opacity: .5; }
 .shop-card.checked .shop-name { text-decoration: line-through; }
 .shop-card input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--green); cursor: pointer; flex-shrink: 0; }
-.shop-name { flex: 1; font-size: .95rem; font-weight: 500; }
-.shop-qty  { font-size: .82rem; color: var(--muted); }
+.shop-name-wrap { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 4px; overflow: hidden; }
+.shop-name { font-size: .95rem; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+.shop-sources { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.shop-qty  { font-size: .82rem; color: var(--muted); flex-shrink: 0; }
 
 /* ======== FAB ======== */
 .fab {

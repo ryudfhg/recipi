@@ -955,12 +955,16 @@ function applyNeededToShopList(neededMap) {
       existing.totalNeeded = prevTotal + item.qty;
       const newRequired = Math.max(0, existing.totalNeeded - inStock);
       existing.qty = fmtQty(newRequired);
+      if (item.sources && item.sources.length) {
+        if (!existing.sources) existing.sources = [];
+        existing.sources.push(...item.sources);
+      }
       if (newRequired > 0) addedItems.push({ name: item.name, qty: fmtQty(newRequired), unit: item.unit });
     } else {
       const required = item.qty - inStock;
       if (required <= 0) { skipped++; return; }
       const qtyStr = fmtQty(required);
-      shopItems.push({ id: Date.now() + Math.random(), name: item.name, qty: qtyStr, unit: item.unit, cat: item.cat, checked: false, totalNeeded: item.qty });
+      shopItems.push({ id: Date.now() + Math.random(), name: item.name, qty: qtyStr, unit: item.unit, cat: item.cat, checked: false, totalNeeded: item.qty, sources: item.sources || [] });
       addedItems.push({ name: item.name, qty: qtyStr, unit: item.unit });
     }
   });
@@ -1027,8 +1031,12 @@ async function addMealDayToShopList() {
         const rawQty = toNum(ing.qty);
         const scaled = isNaN(rawQty) || rawQty === 0 ? 0 : rawQty * ratio;
         const key = `${ing.name}__${ing.unit || ''}`;
-        if (needed[key]) needed[key].qty += scaled;
-        else needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled };
+        if (needed[key]) {
+          needed[key].qty += scaled;
+          needed[key].sources.push({ label: name, qty: scaled });
+        } else {
+          needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled, sources: [{ label: name, qty: scaled }] };
+        }
       });
     });
   });
@@ -1168,8 +1176,12 @@ async function executeMultiDayBuy() {
       const rawQty = toNum(ing.qty);
       const scaled = isNaN(rawQty) || rawQty === 0 ? 0 : rawQty * ratio;
       const key = `${ing.name}__${ing.unit || ''}`;
-      if (needed[key]) needed[key].qty += scaled;
-      else needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled };
+      if (needed[key]) {
+        needed[key].qty += scaled;
+        needed[key].sources.push({ label: recipeName, qty: scaled });
+      } else {
+        needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled, sources: [{ label: recipeName, qty: scaled }] };
+      }
     });
   });
 
@@ -1240,8 +1252,12 @@ async function executeBuyFromSheet() {
       const rawQty = toNum(ing.qty);
       const scaled = isNaN(rawQty) || rawQty === 0 ? 0 : rawQty * ratio;
       const key = `${ing.name}__${ing.unit || ''}`;
-      if (needed[key]) needed[key].qty += scaled;
-      else needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled };
+      if (needed[key]) {
+        needed[key].qty += scaled;
+        needed[key].sources.push({ label: item.name, qty: scaled });
+      } else {
+        needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled, sources: [{ label: item.name, qty: scaled }] };
+      }
     });
   });
 
@@ -1278,8 +1294,12 @@ async function addSlotToShopList(slot) {
       const rawQty = toNum(ing.qty);
       const scaled = isNaN(rawQty) || rawQty === 0 ? 0 : rawQty * ratio;
       const key = `${ing.name}__${ing.unit || ''}`;
-      if (needed[key]) needed[key].qty += scaled;
-      else needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled };
+      if (needed[key]) {
+        needed[key].qty += scaled;
+        needed[key].sources.push({ label: name, qty: scaled });
+      } else {
+        needed[key] = { name: ing.name, unit: ing.unit || '', cat: ing.cat || 'その他', qty: scaled, sources: [{ label: name, qty: scaled }] };
+      }
     });
   });
 
@@ -1666,13 +1686,26 @@ function renderShopItems() {
   container.innerHTML = Object.entries(groups).map(([cat, items]) => `
     <div class="shop-category-group">
       <div class="category-label">${esc(cat)}</div>
-      ${items.map(i => `
+      ${items.map(i => {
+        const visibleSources = (i.sources || []).filter(s => s.qty > 0);
+        let sourcesHTML = '';
+        if (visibleSources.length > 0) {
+          const MAX_SHOW = 2;
+          const shown = visibleSources.slice(0, MAX_SHOW);
+          const rest  = visibleSources.length - MAX_SHOW;
+          let txt = shown.map(s => `${esc(s.label)}: ${esc(fmtQty(s.qty))}${esc(i.unit)}`).join('・');
+          if (rest > 0) txt += `・他${rest}件`;
+          sourcesHTML = `<span class="shop-sources">${txt}</span>`;
+        }
+        return `
         <div class="shop-card ${i.checked ? 'checked' : ''}" onclick="toggleShopItem(${i.id})">
           <input type="checkbox" ${i.checked ? 'checked' : ''} onclick="event.stopPropagation();toggleShopItem(${i.id})">
-          <span class="shop-name">${esc(i.name)}</span>
+          <div class="shop-name-wrap">
+            <span class="shop-name">${esc(i.name)}</span>${sourcesHTML}
+          </div>
           <span class="shop-qty">${esc(i.qty)} ${esc(i.unit)}</span>
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
     </div>
   `).join('');
 }
